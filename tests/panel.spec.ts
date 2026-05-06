@@ -1,35 +1,53 @@
 import { test, expect } from '@grafana/plugin-e2e';
 
-test('should display "No data" in case panel data is empty', async ({
-  gotoPanelEditPage,
-  readProvisionedDashboard,
-}) => {
+test('trace mode shows hint when no trace ID is set', async ({ gotoPanelEditPage, readProvisionedDashboard }) => {
   const dashboard = await readProvisionedDashboard({ fileName: 'dashboard.json' });
-  const panelEditPage = await gotoPanelEditPage({ dashboard, id: '2' });
-  await expect(panelEditPage.panel.locator).toContainText('No data');
-});
-
-test('should display circle when data is passed to the panel', async ({
-  panelEditPage,
-  readProvisionedDataSource,
-  page,
-}) => {
-  const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-  await panelEditPage.datasource.set(ds.name);
-  await panelEditPage.setVisualization('Jaeger-Panel');
-  await expect(page.getByTestId('simple-panel-circle')).toBeVisible();
-});
-
-test('should display series counter when "Show series counter" option is enabled', async ({
-  gotoPanelEditPage,
-  readProvisionedDashboard,
-  page,
-}) => {
-  const dashboard = await readProvisionedDashboard({ fileName: 'dashboard.json' });
+  // Panel 1 has mode=trace and traceId="${traceId}" which defaults to empty
   const panelEditPage = await gotoPanelEditPage({ dashboard, id: '1' });
-  const options = panelEditPage.getCustomOptions('Jaeger-Panel');
-  const showSeriesCounter = options.getSwitch('Show series counter');
+  await expect(panelEditPage.panel.locator).toContainText('Enter a Trace ID in panel options.');
+});
 
-  await showSeriesCounter.check();
-  await expect(page.getByTestId('simple-panel-series-counter')).toBeVisible();
+test('diff mode shows hint when trace IDs are not set', async ({ gotoPanelEditPage, readProvisionedDashboard }) => {
+  const dashboard = await readProvisionedDashboard({ fileName: 'dashboard.json' });
+  // Panel 3 has mode=diff with empty traceId and traceIdB
+  const panelEditPage = await gotoPanelEditPage({ dashboard, id: '3' });
+  await expect(panelEditPage.panel.locator).toContainText('Enter two Trace IDs in panel options.');
+});
+
+test('search mode shows hint when no service is set', async ({
+  gotoPanelEditPage,
+  readProvisionedDashboard,
+}) => {
+  const dashboard = await readProvisionedDashboard({ fileName: 'dashboard.json' });
+  // Panel 2 has mode=search with no service — must show hint, not a broken iframe
+  const panelEditPage = await gotoPanelEditPage({ dashboard, id: '2' });
+  await expect(panelEditPage.panel.locator).toContainText('Enter a Service name in panel options.');
+});
+
+test('search mode renders iframe with correct URL when service is set', async ({
+  gotoPanelEditPage,
+  readProvisionedDashboard,
+}) => {
+  const dashboard = await readProvisionedDashboard({ fileName: 'dashboard.json' });
+  // Panel 5 has mode=search with service=frontend
+  const panelEditPage = await gotoPanelEditPage({ dashboard, id: '5' });
+  const iframe = panelEditPage.panel.locator.locator('[data-testid="jaeger-panel-iframe"]');
+  await expect(iframe).toBeVisible();
+  await expect(iframe).toHaveAttribute('src', /\/search\?/);
+  await expect(iframe).toHaveAttribute('src', /uiEmbed=v0/);
+  await expect(iframe).toHaveAttribute('src', /uiSearchHideGraph=1/);
+  await expect(iframe).toHaveAttribute('src', /service=frontend/);
+});
+
+test('trace mode renders iframe with correct src when trace ID is set', async ({
+  gotoPanelEditPage,
+  readProvisionedDashboard,
+}) => {
+  const dashboard = await readProvisionedDashboard({ fileName: 'dashboard.json' });
+  // Panel 4 has mode=trace with hardcoded traceId="abc123"
+  const panelEditPage = await gotoPanelEditPage({ dashboard, id: '4' });
+  const iframe = panelEditPage.panel.locator.locator('[data-testid="jaeger-panel-iframe"]');
+  await expect(iframe).toBeVisible();
+  await expect(iframe).toHaveAttribute('src', /\/trace\/abc123/);
+  await expect(iframe).toHaveAttribute('src', /uiEmbed=v0/);
 });

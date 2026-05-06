@@ -1,7 +1,7 @@
-# ADR 0010: Embedding Jaeger Trace Visualizations in Grafana
+# ADR 0001: Embedding Jaeger Trace Visualizations in Grafana
 
-**Status**: In progress (Phase 0 complete)
-**Last Updated**: 2026-05-06
+* **Status**: In progress (Phase 1 complete)
+* **Last Updated**: 2026-05-06
 
 ---
 
@@ -319,21 +319,19 @@ The phases are ordered to reduce project risk as early as possible. The first tw
 
 #### Phase 1 — Panel plugin MVP (2–3 days)
 
-**Goal:** A real panel plugin, properly scaffolded, where the iframe `src` is driven by a panel option (Jaeger base URL + trace ID). No datasource yet — trace ID comes from a dashboard variable or is typed in manually. Validates that the two-plugin architecture (separate panel and datasource) is viable in practice.
-
-**Tasks:**
-1. Create `integrations/grafana-plugin/` in the jaeger repo. Run `@grafana/create-plugin` scaffold. Set `plugin.json` `id` to `jaegertracing-jaeger-panel`, `type` to `panel`.
-2. Implement `JaegerPanel.tsx`: read `jaegerBaseUrl`, `mode` (trace/diff/search), and `traceId` from panel options; construct the embed URL; render `<iframe>`.
-3. Implement the options editor (`PanelOptions.tsx`): base URL text input, mode selector, trace ID text input (for manual use without a datasource).
-4. Build (`npm run build`) and load into the same local Grafana Docker setup from Phase 0. Manually verify:
-   - Typing a trace ID into panel options renders the correct trace.
-   - Changing the mode to diff and entering two IDs renders the diff view.
-   - Resizing the Grafana panel resizes the iframe correctly.
-5. Add a `build-grafana-plugin` Makefile target. No CI workflow yet.
-
-**No automated tests at this phase.** Manual verification is sufficient to confirm the two-plugin architecture works before building the datasource.
-
 **Exit criterion:** A developer can add the panel to a Grafana dashboard, type a trace ID into panel options, and see the Jaeger trace timeline render inside the panel.
+
+**Status: ✅ COMPLETE (2026-05-06)**
+- Plugin moved to standalone repo `github.com/jaegertracing/grafana-plugin`.
+- `src/components/JaegerPanel.tsx` implements the iframe panel with `replaceVariables()` applied to all text fields (trace IDs, service, base URL), enabling Grafana dashboard variable interpolation (e.g. `${traceId}`).
+- Options editor covers: mode (trace/diff/search), Jaeger base URL, trace ID(s), service (search mode), and three embed-flag toggles (hide minimap, hide trace summary, collapse trace header).
+- Search mode requires a service to be set before rendering the iframe; shows a hint otherwise. Workaround for the Phase 0 auto-query bug until Phase 2 fixes it in jaeger-ui.
+- Provisioned dashboard (`provisioning/dashboards/dashboard.json`) with 5 panels covering all three modes and a `$traceId` textbox variable.
+- 5 Playwright e2e tests (`tests/panel.spec.ts`) covering hint states and iframe URL correctness; all passing.
+- `docker-compose.yaml` runs Grafana only; Jaeger+HotROD run as a separate stack.
+- `Makefile` with `build`, `dev`, `test`, `lint`, `server`, `e2e` targets.
+
+---
 
 ---
 
