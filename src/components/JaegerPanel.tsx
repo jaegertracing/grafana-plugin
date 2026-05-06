@@ -6,14 +6,11 @@ type Props = PanelProps<JaegerPanelOptions>;
 
 function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables']): string | null {
   const base = replaceVariables(options.jaegerBaseUrl).replace(/\/$/, '');
-  const traceId = replaceVariables(options.traceId).trim();
-  const traceIdB = replaceVariables(options.traceIdB).trim();
-  const service = replaceVariables(options.service).trim();
-
   const params = new URLSearchParams({ uiEmbed: 'v0' });
 
   switch (options.mode) {
-    case 'trace':
+    case 'trace': {
+      const traceId = replaceVariables(options.traceId).trim();
       if (!traceId) {
         return null;
       }
@@ -26,9 +23,12 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
       if (options.collapseTraceHeader) {
         params.set('uiTimelineCollapseTitle', '1');
       }
-      return `${base}/trace/${traceId}?${params}`;
+      return `${base}/trace/${encodeURIComponent(traceId)}?${params}`;
+    }
 
-    case 'diff':
+    case 'diff': {
+      const traceId = replaceVariables(options.traceId).trim();
+      const traceIdB = replaceVariables(options.traceIdB).trim();
       if (!traceId || !traceIdB) {
         return null;
       }
@@ -41,17 +41,20 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
       if (options.collapseTraceHeader) {
         params.set('uiTimelineCollapseTitle', '1');
       }
-      return `${base}/trace/${traceId}...${traceIdB}?${params}`;
+      return `${base}/trace/${encodeURIComponent(traceId)}...${encodeURIComponent(traceIdB)}?${params}`;
+    }
 
-    case 'search':
+    case 'search': {
       // Jaeger auto-submits the search query on load; without a service it errors immediately.
       // Until jaeger-ui suppresses the auto-query in embed mode (Phase 2), require a service.
+      const service = replaceVariables(options.service ?? '').trim();
       if (!service) {
         return null;
       }
       params.set('uiSearchHideGraph', '1');
       params.set('service', service);
       return `${base}/search?${params}`;
+    }
 
     default:
       return null;

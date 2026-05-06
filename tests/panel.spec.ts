@@ -33,11 +33,10 @@ test('search mode renders iframe with correct URL when service is set', async ({
   const panelEditPage = await gotoPanelEditPage({ dashboard, id: '5' });
   const iframe = panelEditPage.panel.locator.locator('[data-testid="jaeger-panel-iframe"]');
   await expect(iframe).toBeVisible();
-  const src = await iframe.getAttribute('src');
-  expect(src).toContain('/search?');
-  expect(src).toContain('uiEmbed=v0');
-  expect(src).toContain('uiSearchHideGraph=1');
-  expect(src).toContain('service=frontend');
+  await expect(iframe).toHaveAttribute('src', /\/search\?/);
+  await expect(iframe).toHaveAttribute('src', /uiEmbed=v0/);
+  await expect(iframe).toHaveAttribute('src', /uiSearchHideGraph=1/);
+  await expect(iframe).toHaveAttribute('src', /service=frontend/);
 });
 
 test('trace mode renders iframe with correct src when trace ID is set', async ({
@@ -49,7 +48,6 @@ test('trace mode renders iframe with correct src when trace ID is set', async ({
   const panelEditPage = await gotoPanelEditPage({ dashboard, id: '4' });
   const iframe = panelEditPage.panel.locator.locator('[data-testid="jaeger-panel-iframe"]');
   await expect(iframe).toBeVisible();
-  const src = await iframe.getAttribute('src');
-  expect(src).toContain('/trace/abc123');
-  expect(src).toContain('uiEmbed=v0');
+  await expect(iframe).toHaveAttribute('src', /\/trace\/abc123/);
+  await expect(iframe).toHaveAttribute('src', /uiEmbed=v0/);
 });

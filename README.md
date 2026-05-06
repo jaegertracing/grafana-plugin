@@ -51,20 +51,25 @@ Use Grafana dashboard variables to drive the trace ID from a URL parameter or fr
 # Build the plugin
 make build
 
-# Start Grafana, Jaeger all-in-one, and HotROD demo app
+# Start Grafana (loads the built plugin from dist/)
 make server
 
 # Watch mode for development
 make dev
 ```
 
-Services started by `make server`:
+`make server` starts Grafana only. Run Jaeger and HotROD separately:
+
+```bash
+cd /path/to/jaeger/examples/hotrod
+docker compose up
+```
 
 | Service | URL |
 |---------|-----|
 | Grafana | http://localhost:3000 (admin / admin) |
-| Jaeger UI | http://localhost:16686 |
-| HotROD demo | http://localhost:8080 |
+| Jaeger UI | http://localhost:16686 (separate stack) |
+| HotROD demo | http://localhost:8080 (separate stack) |
 
 ### Run e2e tests
 
