@@ -4,8 +4,24 @@ import { JaegerPanelOptions } from 'types';
 
 type Props = PanelProps<JaegerPanelOptions>;
 
+function resolveBase(raw: string): string | null {
+  const trimmed = raw.trim().replace(/\/$/, '');
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return trimmed;
+}
+
 function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables']): string | null {
-  const base = replaceVariables(options.jaegerBaseUrl).replace(/\/$/, '');
+  const base = resolveBase(replaceVariables(options.jaegerBaseUrl));
+  if (!base) {
+    return null;
+  }
   const params = new URLSearchParams({ uiEmbed: 'v0' });
 
   switch (options.mode) {
@@ -61,16 +77,23 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
   }
 }
 
+function hint(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables']): string {
+  if (!resolveBase(replaceVariables(options.jaegerBaseUrl))) {
+    return 'Enter a valid Jaeger UI base URL (http:// or https://) in panel options.';
+  }
+  if (options.mode === 'diff') {
+    return 'Enter two Trace IDs in panel options.';
+  }
+  if (options.mode === 'search') {
+    return 'Enter a Service name in panel options.';
+  }
+  return 'Enter a Trace ID in panel options.';
+}
+
 export const JaegerPanel: React.FC<Props> = ({ options, width, height, replaceVariables }) => {
   const url = buildUrl(options, replaceVariables);
 
   if (!url) {
-    const hint =
-      options.mode === 'diff'
-        ? 'Enter two Trace IDs in panel options.'
-        : options.mode === 'search'
-          ? 'Enter a Service name in panel options.'
-          : 'Enter a Trace ID in panel options.';
     return (
       <div
         style={{
@@ -84,7 +107,7 @@ export const JaegerPanel: React.FC<Props> = ({ options, width, height, replaceVa
         }}
         data-testid="jaeger-panel-hint"
       >
-        {hint}
+        {hint(options, replaceVariables)}
       </div>
     );
   }
