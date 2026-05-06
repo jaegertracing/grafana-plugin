@@ -1,95 +1,187 @@
 {
   "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
-      }
-    ]
+    "list": []
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": null,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "datasource": {
-        "type": "grafana-testdata-datasource",
-        "uid": "trlxrdZVk"
+        "type": "grafana",
+        "uid": "-- Grafana --"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 16,
+        "w": 24,
         "x": 0,
         "y": 0
       },
       "id": 1,
       "options": {
-        "seriesCountSize": "sm",
-        "showSeriesCount": false,
-        "text": "Default value of text input option"
+        "jaegerBaseUrl": "http://localhost:16686",
+        "mode": "trace",
+        "traceId": "${traceId}",
+        "traceIdB": "",
+        "service": "",
+        "hideTimelineMinimap": false,
+        "hideTimelineSummary": false,
+        "collapseTraceHeader": false
       },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-testdata-datasource",
-            "uid": "db84e60d-b92a-4089-82cb-34842fb1754b"
-          },
-          "refId": "A",
-          "scenarioId": "raw_frame",
-          "rawFrameContent": "[\n  {\n    \"columns\": [\n      {\n        \"text\": \"Time\",\n        \"type\": \"time\"\n      },\n      {\n        \"text\": \"Label\",\n        \"type\": \"string\"\n      },\n      {\n        \"text\": \"Value\",\n        \"type\": \"number\"\n      }\n    ],\n    \"rows\": [\n      [1609459200000, \"A\", 10],\n      [1609462800000, \"B\", 20],\n      [1609466400000, \"C\", 15],\n      [1609470000000, \"D\", 25],\n      [1609473600000, \"E\", 30]\n    ]\n  },\n{\n    \"columns\": [\n      {\n        \"text\": \"Time\",\n        \"type\": \"time\"\n      },\n      {\n        \"text\": \"Label\",\n        \"type\": \"string\"\n      },\n      {\n        \"text\": \"Value\",\n        \"type\": \"number\"\n      }\n    ],\n    \"rows\": [\n      [1609459200000, \"A\", 40],\n      [1609462800000, \"B\", 50],\n      [1609466400000, \"C\", 45],\n      [1609470000000, \"D\", 55],\n      [1609473600000, \"E\", 60]\n    ]\n  }\n]"
-        }
-      ],
-      "title": "Sample Panel Title",
+      "targets": [],
+      "title": "Jaeger Trace",
+      "transformations": [],
       "type": "jaegertracing-jaeger-panel"
     },
     {
       "datasource": {
-        "type": "grafana-testdata-datasource",
-        "uid": "trlxrdZVk"
+        "type": "grafana",
+        "uid": "-- Grafana --"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 12,
         "w": 12,
-        "x": 12,
-        "y": 0
+        "x": 0,
+        "y": 16
       },
       "id": 2,
       "options": {
-        "seriesCountSize": "sm",
-        "showSeriesCount": false,
-        "text": "Default value of text input option"
+        "jaegerBaseUrl": "http://localhost:16686",
+        "mode": "search",
+        "traceId": "",
+        "traceIdB": "",
+        "service": "",
+        "hideTimelineMinimap": false,
+        "hideTimelineSummary": false,
+        "collapseTraceHeader": false
       },
-      "targets": [
-        {
-          "alias": "",
-          "datasource": {
-            "type": "grafana-testdata-datasource",
-            "uid": "db84e60d-b92a-4089-82cb-34842fb1754b"
-          },
-          "refId": "A",
-          "scenarioId": "no_data_points"
-        }
-      ],
-      "title": "Sample Panel Title",
+      "targets": [],
+      "title": "Jaeger Search",
+      "transformations": [],
+      "type": "jaegertracing-jaeger-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana",
+        "uid": "-- Grafana --"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 3,
+      "options": {
+        "jaegerBaseUrl": "http://localhost:16686",
+        "mode": "diff",
+        "traceId": "",
+        "traceIdB": "",
+        "service": "",
+        "hideTimelineMinimap": false,
+        "hideTimelineSummary": false,
+        "collapseTraceHeader": false
+      },
+      "targets": [],
+      "title": "Jaeger Diff",
+      "transformations": [],
+      "type": "jaegertracing-jaeger-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana",
+        "uid": "-- Grafana --"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "jaegerBaseUrl": "http://localhost:16686",
+        "mode": "search",
+        "traceId": "",
+        "traceIdB": "",
+        "service": "frontend",
+        "hideTimelineMinimap": false,
+        "hideTimelineSummary": false,
+        "collapseTraceHeader": false
+      },
+      "targets": [],
+      "title": "Jaeger Search (service=frontend)",
+      "transformations": [],
+      "type": "jaegertracing-jaeger-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana",
+        "uid": "-- Grafana --"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 4,
+      "options": {
+        "jaegerBaseUrl": "http://localhost:16686",
+        "mode": "trace",
+        "traceId": "abc123",
+        "traceIdB": "",
+        "service": "",
+        "hideTimelineMinimap": false,
+        "hideTimelineSummary": false,
+        "collapseTraceHeader": false
+      },
+      "targets": [],
+      "title": "Jaeger Trace (fixed ID for testing)",
+      "transformations": [],
       "type": "jaegertracing-jaeger-panel"
     }
   ],
   "refresh": "",
   "schemaVersion": 39,
-  "tags": [],
+  "tags": ["jaeger"],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "value": ""
+        },
+        "hide": 0,
+        "label": "Trace ID",
+        "name": "traceId",
+        "options": [],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      }
+    ]
   },
   "time": {
     "from": "now-6h",
@@ -97,8 +189,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Provisioned jaeger-panel dashboard",
-  "uid": "a538aeff-5a8a-42a5-901c-938d896fdd6f",
+  "title": "Jaeger Traces",
+  "uid": "jaeger-panel-phase1",
   "version": 1,
   "weekStart": ""
 }

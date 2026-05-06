@@ -5,4 +5,8 @@ export interface JaegerPanelOptions {
   mode: PanelMode;
   traceId: string;
   traceIdB: string;
+  service: string;
+  hideTimelineMinimap: boolean;
+  hideTimelineSummary: boolean;
+  collapseTraceHeader: boolean;
 }
