@@ -1,0 +1,9 @@
+apiVersion: 1
+
+datasources:
+  - name: Jaeger
+    type: jaegertracing-jaeger-datasource
+    access: proxy
+    isDefault: true
+    jsonData:
+      jaegerUrl: http://jaeger:16686
