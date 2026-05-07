@@ -97,7 +97,6 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
     const frame = new MutableDataFrame({
       name: 'traces',
-      meta: { preferredVisualisationPluginId: 'jaegertracing-jaeger-panel' },
       fields: [
         { name: 'traceID', type: FieldType.string, config: { links: [traceLink] } },
         { name: 'spanCount', type: FieldType.number },
