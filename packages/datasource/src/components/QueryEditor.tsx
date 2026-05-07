@@ -22,12 +22,15 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
   }, [datasource]);
 
   useEffect(() => {
-    if (query.service) {
-      datasource.getOperations(query.service).then(setOperations).catch(() => setOperations([]));
+    // Skip fetch if service is empty, a template variable, or not yet in the discovered list
+    // (allowCustomValue lets users type variables like ${service} which are not real service names)
+    const isLiteralService = query.service && services.includes(query.service);
+    if (isLiteralService) {
+      datasource.getOperations(query.service!).then(setOperations).catch(() => setOperations([]));
     } else {
-      Promise.resolve([]).then(setOperations);
+      setOperations([]);
     }
-  }, [datasource, query.service]);
+  }, [datasource, query.service, services]);
 
   const handleQueryTypeChange = useCallback(
     (value: 'search' | 'trace') => {
