@@ -104,11 +104,11 @@ A community Jaeger datasource plugin + panel plugin pair that replaces the built
 
 **Why `splitOpen()` is a poor fit for the iframe panel:**
 
-Grafana's `splitOpen()` mechanism — used internally when clicking a trace ID in Explore — opens a second Explore pane side-by-side at half the viewport width. This works well for Grafana's built-in `TraceView` component, which is a compact React component designed for that width. It does not work well for our iframe panel: Jaeger UI requires substantial horizontal space, and at half-screen width the timeline is cramped and the column drag handles stop working.
+Grafana's `splitOpen()` mechanism — used internally when clicking a trace ID in Explore — opens a second Explore pane side-by-side at half the viewport width. The second pane is a full Explore panel with its own query builder form at the top (in Trace ID mode), occupying substantial vertical space before the trace view begins. The built-in Jaeger datasource has exactly the same experience. At half-screen width, the Jaeger timeline is cramped and the column drag handles stop working.
 
-This is a fundamental mismatch between `splitOpen()` and an iframe-based renderer. **The slide-in trace detail experience that exists in the built-in Jaeger datasource depends on Grafana's own `TraceView` component**, which has full access to the Grafana rendering context and can render compactly. We cannot replicate that experience with an iframe without contributing a compact embedded mode to Jaeger UI (out of scope for this project).
+There is no "compact" split-pane mode in Grafana. The half-width full-Explore experience is the same for all datasources that use `splitOpen()`. For our iframe panel, it is particularly uncomfortable because Jaeger UI needs horizontal space that is simply not available.
 
-**Consequence for our plugin:** `splitOpen()` (triggered by clicking a trace ID data link in our search results table) works but is awkward. It is retained as a convenience for users already in Explore who want a quick look at a trace. The primary intended UX for trace viewing is the dashboard two-panel pattern below.
+**Consequence for our plugin:** `splitOpen()` (triggered by clicking a trace ID data link in our search results table) works but is awkward. It is retained as a convenience for users already in Explore who want a quick look at a trace. The primary intended UX for trace viewing is the dashboard two-panel pattern described under Level 1.
 
 **What is required:**
 - One panel plugin (same as Level 1).
