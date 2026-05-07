@@ -25,7 +25,7 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
     if (query.service) {
       datasource.getOperations(query.service).then(setOperations).catch(() => setOperations([]));
     } else {
-      setOperations([]);
+      Promise.resolve([]).then(setOperations);
     }
   }, [datasource, query.service]);
 
