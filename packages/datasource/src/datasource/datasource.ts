@@ -29,17 +29,14 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
   }
 
   private async runQuery(query: JaegerQuery): Promise<MutableDataFrame[]> {
-    if (query.queryType === 'trace' && query.traceId) {
-      return this.fetchTrace(query.traceId);
+    if (query.queryType === 'trace') {
+      return query.traceId ? this.fetchTrace(query.traceId) : [];
     }
-    if (query.service) {
-      return this.fetchTraces(query);
-    }
-    return [];
+    return query.service ? this.fetchTraces(query) : [];
   }
 
   private async fetchTrace(traceId: string): Promise<MutableDataFrame[]> {
-    const response = await lastValueFrom(
+    await lastValueFrom(
       getBackendSrv().fetch<{ data: unknown[] }>({
         url: `${this.proxyUrl}/api/traces/${encodeURIComponent(traceId)}`,
       })
