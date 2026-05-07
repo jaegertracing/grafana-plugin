@@ -207,6 +207,7 @@ jobs:
       - name: Upload e2e test summary
         uses: grafana/plugin-actions/playwright-gh-pages/upload-report-artifacts@upload-report-artifacts/v1.0.1
         if: ${{ always() && !cancelled() }}
+        continue-on-error: true
         with:
           upload-report: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
