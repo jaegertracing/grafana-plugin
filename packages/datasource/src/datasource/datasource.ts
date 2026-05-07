@@ -64,7 +64,13 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       params.set('maxDuration', query.maxDuration);
     }
     if (query.tags) {
-      params.set('tags', query.tags);
+      // Jaeger HTTP API accepts repeated "tag=key:value" params (colon separator).
+      // The plural "tags" param expects a JSON map; we use "tag" to avoid JSON encoding.
+      for (const pair of query.tags.trim().split(/\s+/)) {
+        if (pair) {
+          params.append('tag', pair);
+        }
+      }
     }
 
     const response = await lastValueFrom(
