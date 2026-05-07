@@ -6,6 +6,7 @@ import {
   DataSourceInstanceSettings,
   FieldType,
   MutableDataFrame,
+  TimeRange,
 } from '@grafana/data';
 import { getBackendSrv, isFetchError } from '@grafana/runtime';
 import { lastValueFrom } from 'rxjs';
@@ -24,16 +25,16 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     const results = await Promise.all(
       request.targets
         .filter((target) => !target.hide)
-        .map((target) => this.runQuery(target))
+        .map((target) => this.runQuery(target, request.range))
     );
     return { data: results.flat() };
   }
 
-  private async runQuery(query: JaegerQuery): Promise<MutableDataFrame[]> {
+  private async runQuery(query: JaegerQuery, range: TimeRange): Promise<MutableDataFrame[]> {
     if (query.queryType === 'trace') {
       return query.traceId ? this.fetchTrace(query.traceId) : [];
     }
-    return query.service ? this.fetchTraces(query) : [];
+    return query.service ? this.fetchTraces(query, range) : [];
   }
 
   private async fetchTrace(traceId: string): Promise<MutableDataFrame[]> {
@@ -51,8 +52,11 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     return [frame];
   }
 
-  private async fetchTraces(query: JaegerQuery): Promise<MutableDataFrame[]> {
+  private async fetchTraces(query: JaegerQuery, range: TimeRange): Promise<MutableDataFrame[]> {
     const params = new URLSearchParams({ service: query.service ?? '' });
+    // Jaeger expects start/end in microseconds
+    params.set('start', String(range.from.valueOf() * 1000));
+    params.set('end', String(range.to.valueOf() * 1000));
     if (query.operation) {
       params.set('operation', query.operation);
     }
