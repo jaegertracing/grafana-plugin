@@ -39,17 +39,13 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       tags: query.tags ? getTemplateSrv().replace(query.tags) : query.tags,
     };
     if (interpolated.queryType === 'trace') {
-      return interpolated.traceId ? this.fetchTrace(interpolated.traceId) : [];
+      return Promise.resolve(interpolated.traceId ? this.fetchTrace(interpolated.traceId) : []);
     }
     return interpolated.service ? this.fetchTraces(interpolated, range) : [];
   }
 
-  private async fetchTrace(traceId: string): Promise<MutableDataFrame[]> {
-    await lastValueFrom(
-      getBackendSrv().fetch<{ data: unknown[] }>({
-        url: `${this.proxyUrl}/api/traces/${encodeURIComponent(traceId)}`,
-      })
-    );
+  private fetchTrace(traceId: string): MutableDataFrame[] {
+    // No API call needed: the panel renders the trace via iframe, which fetches it directly.
     const frame = new MutableDataFrame({
       name: traceId,
       meta: { preferredVisualisationPluginId: 'jaegertracing-jaeger-panel' },
