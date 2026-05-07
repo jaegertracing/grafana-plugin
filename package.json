@@ -10,7 +10,8 @@
     "build": "npm run build --workspaces",
     "test:ci": "npm run test:ci --workspaces",
     "lint": "npm run lint --workspaces",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "e2e": "playwright test --config playwright/config.ts"
   },
   "engines": {
     "node": ">=22"

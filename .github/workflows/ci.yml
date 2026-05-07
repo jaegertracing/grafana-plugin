@@ -52,7 +52,7 @@ jobs:
       - name: Check for E2E
         id: check-for-e2e
         run: |
-          if [ -f "playwright/config.ts" ]
+          if [ -f "../../playwright/config.ts" ]
           then
             echo "has-e2e=true" >> $GITHUB_OUTPUT
           fi
@@ -165,9 +165,6 @@ jobs:
         GRAFANA_IMAGE: ${{fromJson(needs.resolve-versions.outputs.matrix)}}
     name: e2e test ${{ matrix.GRAFANA_IMAGE.name }}@${{ matrix.GRAFANA_IMAGE.VERSION }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/panel
     steps:
       - uses: actions/checkout@v4
         with:
@@ -188,12 +185,12 @@ jobs:
 
       - name: Install dev dependencies
         run: npm ci
-        working-directory: .
 
       - name: Start Grafana
         run: |
           docker compose pull
           ANONYMOUS_AUTH_ENABLED=false DEVELOPMENT=false GRAFANA_VERSION=${{ matrix.GRAFANA_IMAGE.VERSION }} GRAFANA_IMAGE=${{ matrix.GRAFANA_IMAGE.NAME }} docker compose up -d
+        working-directory: packages/panel
 
       - name: Wait for grafana server
         uses: grafana/plugin-actions/wait-for-grafana@wait-for-grafana/v1.0.2
@@ -214,15 +211,17 @@ jobs:
           upload-report: false
           github-token: ${{ secrets.GITHUB_TOKEN }}
           test-outcome: ${{ steps.run-tests.outcome }}
-          report-dir: packages/panel/playwright/.report
+          report-dir: playwright/.report
 
       - name: Docker logs
         if: ${{ always() && steps.run-tests.outcome == 'failure' }}
         run: |
           docker logs jaegertracing-jaeger-panel >& grafana-server.log
+        working-directory: packages/panel
 
       - name: Stop grafana docker
         run: docker compose down
+        working-directory: packages/panel
 
   publish-report:
     if: ${{ always() && !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
