@@ -71,12 +71,24 @@ A Grafana panel plugin receives a trace ID — from a dashboard variable, from a
 - The panel plugin renders the trace for `$traceId`.
 - For trace diff, two variables `$traceIdA` and `$traceIdB` are used.
 
+**The two-panel dashboard pattern (primary intended UX):**
+
+The best dashboard experience combines a search results table with the Jaeger panel on the same dashboard, connected via a `$traceId` variable:
+
+1. A **table panel** (using the Jaeger datasource) shows search results with `traceID` and `spanCount` columns.
+2. Each `traceID` cell has a data link that updates `$traceId` and stays on the current page: `d/${__dashboard.uid}?var-traceId=${__value.raw}` (or use Grafana's variable setter link syntax).
+3. The **Jaeger panel** below or beside the table reads `${traceId}` from the dashboard variable and renders the trace iframe.
+
+Clicking a row in the table updates the URL variable and the trace panel rerenders inline — no page navigation, no split-pane cramping, full panel width for the trace view.
+
+This is architecturally cleaner than `splitOpen()` for iframe-based rendering and is the pattern to document and build example dashboards around.
+
 **What is required:**
 - One panel plugin. No datasource work.
 - The trace ID must reach the panel via dashboard variables or panel options. This is standard Grafana.
 
 **Limitations:**
-- No search UI. Users must know the trace ID in advance, or navigate to Jaeger UI to search and then return with an ID.
+- No search UI built into the panel itself. The table panel requires the Jaeger datasource to be configured.
 - No Explore integration. The Grafana log-to-trace split-pane flow still uses Grafana's built-in `TraceView`.
 
 ### Level 2: Full Explore Integration (Search → List → Detail)
@@ -89,6 +101,14 @@ A community Jaeger datasource plugin + panel plugin pair that replaces the built
 - Results are either rendered as Jaeger's search page in an iframe, or as a Grafana table with trace IDs.
 - Clicking a trace ID opens the Jaeger trace view (iframe or native components).
 - The datasource sets `preferredVisualisationPluginId` on its result frames, routing them to the Jaeger panel plugin automatically.
+
+**Why `splitOpen()` is a poor fit for the iframe panel:**
+
+Grafana's `splitOpen()` mechanism — used internally when clicking a trace ID in Explore — opens a second Explore pane side-by-side at half the viewport width. This works well for Grafana's built-in `TraceView` component, which is a compact React component designed for that width. It does not work well for our iframe panel: Jaeger UI requires substantial horizontal space, and at half-screen width the timeline is cramped and the column drag handles stop working.
+
+This is a fundamental mismatch between `splitOpen()` and an iframe-based renderer. **The slide-in trace detail experience that exists in the built-in Jaeger datasource depends on Grafana's own `TraceView` component**, which has full access to the Grafana rendering context and can render compactly. We cannot replicate that experience with an iframe without contributing a compact embedded mode to Jaeger UI (out of scope for this project).
+
+**Consequence for our plugin:** `splitOpen()` (triggered by clicking a trace ID data link in our search results table) works but is awkward. It is retained as a convenience for users already in Explore who want a quick look at a trace. The primary intended UX for trace viewing is the dashboard two-panel pattern below.
 
 **What is required:**
 - One panel plugin (same as Level 1).

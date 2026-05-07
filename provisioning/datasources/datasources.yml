@@ -6,3 +6,8 @@ datasources:
     access: proxy
     url: http://jaeger:16686
     isDefault: true
+
+  - name: Jaeger (built-in)
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
