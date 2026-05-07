@@ -1,6 +1,6 @@
 # ADR 0001: Embedding Jaeger Trace Visualizations in Grafana
 
-* **Status**: In progress (Phase 3 in progress)
+* **Status**: In progress (Phase 2 in progress)
 * **Last Updated**: 2026-05-07
 
 ---
@@ -235,7 +235,7 @@ The plugin lives in its own dedicated repository (`github.com/jaegertracing/graf
 
 The Go backend binary (Phase 5), if it needs to import Jaeger internals, will do so as a regular Go module dependency (`github.com/jaegertracing/jaeger`).
 
-**Jaeger UI changes** (`uiEmbed` flag additions in Phase 2, `uiLinkPatterns` in Phase 4) are PRs to the jaeger-ui repo, released independently and consumed here via npm.
+**Jaeger UI changes** (`uiEmbed` flag additions in Phase 4, `uiLinkPatterns` in Phase 5) are PRs to the jaeger-ui repo, released independently and consumed here via npm.
 
 **Repository layout:**
 
@@ -345,21 +345,7 @@ The phases are ordered to reduce project risk as early as possible. The first tw
 
 ---
 
-#### Phase 2 — Jaeger UI `uiEmbed` improvements (parallel with Phase 1, jaeger-ui repo)
-
-**Goal:** Address the UX gaps identified in Phase 0 so the embedded experience is clean.
-
-**Tasks:**
-1. Audit existing `uiEmbed` flags against the embedded UX observed in Phase 0.
-2. Add `uiTimelineHideViewSwitcher=1` to suppress the view-type toolbar (timeline/graph/flamegraph/statistics switcher) when only the timeline is needed.
-3. Add any other flags identified in Phase 0 (e.g., hiding the search bar in the trace detail header).
-4. Files: `packages/jaeger-ui/src/utils/embedded-url.ts`, `packages/jaeger-ui/src/types/embedded.ts`, `TracePageHeader/AltViewOptions.tsx`.
-
-**Exit criterion:** The embedded trace view has no extraneous chrome; the UX is comparable to a native panel.
-
----
-
-#### Phase 3 — Datasource plugin + CI (1–2 weeks) — 🔄 IN PROGRESS
+#### Phase 2 — Datasource plugin + CI (1–2 weeks) — 🔄 IN PROGRESS
 
 **Goal:** A real datasource plugin that drives the panel from a QueryEditor, plus automated CI that prevents regressions. This is the first phase with significant engineering investment, justified now that the core approach is validated.
 
@@ -414,45 +400,11 @@ This confirms that API calls (service/operation discovery, trace search) work se
 
 ---
 
-#### Phase 4 — `uiLinkPatterns` (jaeger-ui repo, 3–5 days)
-
-**Goal:** Allow the Grafana plugin to inject span-to-Grafana link patterns at embed time without requiring Jaeger server reconfiguration.
-
-**Tasks:**
-1. Extend `EmbeddedState` (`types/embedded.ts`) with `linkPatterns?: LinkPatternsConfig[]`.
-2. Parse `uiLinkPatterns=<base64url-json>` in `embedded-url.ts`.
-3. In `model/link-patterns.ts`, merge embedded patterns with config-file patterns (embedded takes precedence).
-4. Add a "Span link patterns" section to the Grafana datasource `ConfigEditor`; base64-encode the patterns and append to every iframe URL.
-
-**Exit criterion:** A user can configure a span-to-Grafana-Explore link in the datasource config and see it appear on span attributes in the embedded trace view.
-
----
-
-#### Phase 5 — Go backend binary: proxy mode (3–4 weeks)
-
-**Goal:** Make the plugin work in deployments where Grafana and Jaeger are behind independent SSO ingress proxies on separate domains.
-
-**Tasks:**
-
-1. Add `Magefile.go` to `integrations/grafana-plugin/`. Add `mage build:linux/darwin/windows` targets producing `dist/gpx_jaeger_*`.
-2. Implement `pkg/plugin/main.go`: `datasource.Manage(...)` factory using `grafana-plugin-sdk-go`.
-3. Implement `pkg/plugin/proxy.go`: `CallResource` handler acting as a reverse proxy for the Jaeger UI SPA:
-   - Forwards requests from `/api/plugins/.../resources/ui/{path}` to Jaeger's internal address.
-   - Rewrites `Host` header, strips Grafana-specific headers.
-   - If bearer token propagation is configured (`--query.bearer-token-propagation` on Jaeger), extracts `Authorization` from `backend.CallResourceRequest.Headers` and injects it on outgoing requests. This header-injection pattern follows `datasource-context.go` in reference plugins such as grafana-trino.
-   - Handles base-path rewriting so Jaeger UI's own `fetch()` calls to `/api/traces` etc. are also proxied (or alternatively, configure Jaeger with `--query.base-path` matching the plugin resource path).
-4. Update `plugin.json`: `"backend": true`, `"executable": "gpx_jaeger"`.
-5. Update `JaegerPanel.tsx`: when proxy mode is active, construct iframe src as `/api/plugins/.../resources/ui/{path}?uiEmbed=v0` instead of the public Jaeger URL.
-6. Add `mage build:linux` to `ci-grafana-plugin.yml`.
-7. Submit to Grafana plugin catalog. Signed plugins with `"backend": true` require Grafana's security review; the binary must be signed before distribution.
-
-**Exit criterion:** Plugin works end-to-end behind independent SSO ingress proxies, with the iframe served from the Grafana origin.
-
----
-
-#### Phase 5 — Proxy Mode: Go Backend Binary (3–4 weeks)
+#### Phase 3 — Go backend binary: proxy mode (3–4 weeks)
 
 **Goal:** Make the plugin work in deployments where Grafana and Jaeger are behind independent SSO ingress proxies. The iframe is served from the Grafana origin; the Go binary proxies all requests to Jaeger's internal address.
+
+This is the highest-risk item in the roadmap: it requires validating that `CallResource` can correctly proxy a full SPA (with HTML rewriting, asset paths, and API calls) through the Grafana backend. It is deliberately placed before the jaeger-ui polish phases to surface this risk early.
 
 **Authentication context:**
 
@@ -489,11 +441,39 @@ Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, 
 
 6. **Update `JaegerPanel`** (TypeScript): when proxy mode is active (read from datasource config), use `/api/plugins/.../resources/ui/{path}?uiEmbed=v0` as the iframe src.
 
-7. **CI**: add `mage build:linux` step to `ci-grafana-plugin.yml`.
+7. **CI**: add `mage build:linux` step to `ci.yml`.
 
 8. **Signing**: submit plugin to Grafana plugin catalog. Signed plugins require `"backend": true` plugins to pass Grafana's security review. The binary must be signed with Grafana's signing tool before distribution.
 
 **Exit criterion:** Plugin works end-to-end in a Grafana + Jaeger setup where both are behind independent SSO ingress proxies, with the iframe served from the Grafana origin.
+
+---
+
+#### Phase 4 — Jaeger UI `uiEmbed` improvements (jaeger-ui repo, 1–2 days)
+
+**Goal:** Address the UX gaps identified in Phase 0 so the embedded experience is clean.
+
+**Tasks:**
+1. Audit existing `uiEmbed` flags against the embedded UX observed in Phase 0.
+2. Add `uiTimelineHideViewSwitcher=1` to suppress the view-type toolbar (timeline/graph/flamegraph/statistics switcher) when only the timeline is needed.
+3. Add any other flags identified in Phase 0 (e.g., hiding the search bar in the trace detail header, fixing the diff graph resize on panel resize).
+4. Files: `packages/jaeger-ui/src/utils/embedded-url.ts`, `packages/jaeger-ui/src/types/embedded.ts`, `TracePageHeader/AltViewOptions.tsx`.
+
+**Exit criterion:** The embedded trace view has no extraneous chrome; the UX is comparable to a native panel.
+
+---
+
+#### Phase 5 — `uiLinkPatterns` (jaeger-ui repo, 3–5 days)
+
+**Goal:** Allow the Grafana plugin to inject span-to-Grafana link patterns at embed time without requiring Jaeger server reconfiguration.
+
+**Tasks:**
+1. Extend `EmbeddedState` (`types/embedded.ts`) with `linkPatterns?: LinkPatternsConfig[]`.
+2. Parse `uiLinkPatterns=<base64url-json>` in `embedded-url.ts`.
+3. In `model/link-patterns.ts`, merge embedded patterns with config-file patterns (embedded takes precedence).
+4. Add a "Span link patterns" section to the Grafana datasource `ConfigEditor`; base64-encode the patterns and append to every iframe URL.
+
+**Exit criterion:** A user can configure a span-to-Grafana-Explore link in the datasource config and see it appear on span attributes in the embedded trace view.
 
 ---
 
@@ -504,17 +484,17 @@ Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, 
 | Manual PoC: iframe in Grafana panel          | ✅    |      |      |      |      |      |
 | Plugin scaffolding (jaeger repo)             |      | ✅    |      |      |      |      |
 | Panel plugin (iframe, trace + diff)          |      | ✅    |      |      |      |      |
-| `uiEmbed` flag additions (jaeger-ui)         |      |      | ✅    |      |      |      |
-| Datasource plugin + QueryEditor              |      |      |      | ✅    |      |      |
-| Sub-approach 2a (search delegated to iframe) |      |      |      | ✅    |      |      |
-| Variable support                             |      |      |      | ✅    |      |      |
-| CI workflow + Playwright tests               |      |      |      | ✅    |      |      |
-| Sub-approach 2b (thin datasource table)      |      |      |      | ⚠️    |      |      |
-| `uiLinkPatterns` URL param (jaeger-ui)       |      |      |      |      | ✅    |      |
-| Go binary + Magefile                         |      |      |      |      |      | ✅    |
-| `CallResource` SPA reverse proxy             |      |      |      |      |      | ✅    |
-| Bearer token forwarding                      |      |      |      |      |      | ✅    |
-| Grafana plugin catalog submission + signing  |      |      |      |      |      | ✅    |
+| Datasource plugin + QueryEditor              |      |      | ✅    |      |      |      |
+| Sub-approach 2a (search delegated to iframe) |      |      | ✅    |      |      |      |
+| Variable support                             |      |      | ✅    |      |      |      |
+| CI workflow + Playwright tests               |      |      | ✅    |      |      |      |
+| Sub-approach 2b (thin datasource table)      |      |      | ⚠️    |      |      |      |
+| Go binary + Magefile                         |      |      |      | ✅    |      |      |
+| `CallResource` SPA reverse proxy             |      |      |      | ✅    |      |      |
+| Bearer token forwarding                      |      |      |      | ✅    |      |      |
+| Grafana plugin catalog submission + signing  |      |      |      | ✅    |      |      |
+| `uiEmbed` flag additions (jaeger-ui)         |      |      |      |      | ✅    |      |
+| `uiLinkPatterns` URL param (jaeger-ui)       |      |      |      |      |      | ✅    |
 
 ---
 
