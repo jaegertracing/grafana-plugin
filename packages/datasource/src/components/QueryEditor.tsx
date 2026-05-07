@@ -67,12 +67,14 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
           <InlineFieldRow>
             <InlineField label="Service" labelWidth={14}>
               <Select
-                value={services.find((s) => s === query.service) ? { label: query.service, value: query.service } : null}
+                value={query.service ? { label: query.service, value: query.service } : null}
                 options={services.map((s) => ({ label: s, value: s }))}
                 width={32}
-                onChange={(v) => onChange({ ...query, service: v?.value ?? undefined })}
+                onChange={(v) => { onChange({ ...query, service: v?.value ?? undefined }); }}
+                onCreateOption={(v) => { onChange({ ...query, service: v }); }}
                 isClearable
-                placeholder="Select service"
+                allowCustomValue
+                placeholder="Select service or enter variable"
               />
             </InlineField>
             <InlineField label="Operation" labelWidth={14}>

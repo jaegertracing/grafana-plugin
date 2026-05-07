@@ -1,6 +1,6 @@
 # ADR 0001: Embedding Jaeger Trace Visualizations in Grafana
 
-* **Status**: In progress (Phase 2 in progress)
+* **Status**: In progress (Phase 3 next)
 * **Last Updated**: 2026-05-07
 
 ---
@@ -366,53 +366,33 @@ The phases are ordered to reduce project risk as early as possible. The first tw
 
 ---
 
-#### Phase 2 — Datasource plugin + CI (1–2 weeks) — 🔄 IN PROGRESS
+#### Phase 2 — Datasource plugin + CI (1–2 weeks) — ✅ COMPLETE (2026-05-07)
 
-**Goal:** A working datasource plugin connected to the panel plugin so Explore is actually usable end-to-end, plus CI that prevents regressions.
+**Goal:** A working datasource plugin connected to the panel plugin so Explore and dashboards are usable end-to-end, plus CI that prevents regressions.
 
-**What is already built:**
-- Datasource plugin class (`JaegerDataSource`) with `testDatasource()`, `getServices()`, `getOperations()`, and `query()`. The query method returns a DataFrame table of `traceID` + `spanCount` for search mode, and a single-row `traceID` frame for trace-ID lookup.
-- `QueryEditor` with search/trace modes, service/operation selects (populated live from Jaeger), tags, duration, limit fields.
-- CI pipeline (`ci.yml`): build, lint, unit tests, and Playwright e2e tests.
+**What was built:**
+- Datasource plugin (`JaegerDataSource`) with `testDatasource()`, `getServices()`, `getOperations()`, and `query()`.
+- Search results DataFrame: `traceID` (with "Open in Explore" data link), `traceName` (service: operation of root span), `spanCount`, `duration` (µs).
+- Trace lookup DataFrame: single-row `traceID` frame with `preferredVisualisationPluginId` routing to the Jaeger panel.
+- `QueryEditor` with search/trace modes, service/operation selects (populated live from Jaeger), tags, duration, limit fields. Service field accepts Grafana variable syntax (e.g. `${service}`).
+- Grafana template variable interpolation via `getTemplateSrv().replace()` for all query string fields.
+- Panel DataFrame-driven rendering path: single-row `traceID` frame → iframe; multi-row or no data → falls through to panel-options path.
+- Panel minimum iframe height (600px) so the trace is usable in Explore's split pane.
+- Provisioned two-panel dashboard: narrow search results table (w=6) + wide trace detail panel (w=18), connected via `$traceId` variable. Clicking "Open in dashboard" sets the variable and rerenders inline.
+- CI pipeline: build, lint, unit tests, Playwright e2e tests.
+- Provisioned datasource with stable `uid: jaeger` for reliable dashboard references.
 
-**Validated (2026-05-07):** The datasource proxy chain works end-to-end. API calls (service discovery, trace search) flow through the Grafana backend proxy without any browser-to-Jaeger connectivity.
+**Validated (2026-05-07):**
+- Service discovery and trace search flow through the Grafana backend proxy; no browser-to-Jaeger API traffic.
+- Search results table shows `traceName`, `spanCount`, `duration`, with two context-menu links per row: "Open in dashboard" (sets `$traceId` variable, stays on page) and "Open in Explore" (`splitOpen()`, second pane renders trace iframe).
+- `preferredVisualisationPluginId` routes trace-ID lookup results to the Jaeger panel automatically in Explore.
+- Iframe base URL falls back to `http://localhost:16686` (panel default) in Explore's second pane, which works for local dev. Production deployments require Phase 3.
 
-**What is missing — the panel/datasource connection:**
+**Constraints carried forward to Phase 3:**
+- Iframe base URL must still be configured manually in panel options (`jaegerBaseUrl`). The Grafana backend proxy path is not usable for iframe navigation; Phase 3's Go binary resolves this by serving the Jaeger UI from the Grafana origin.
+- `splitOpen()` in Explore opens a cramped half-width second pane (same behaviour as the built-in Jaeger datasource). The two-panel dashboard pattern is the recommended UX for trace viewing.
 
-The panel and datasource are currently independent. The panel reads `jaegerBaseUrl` from its own panel options and ignores incoming DataFrames entirely. The datasource returns DataFrames but the panel never sees them when running in Explore. There are two distinct problems to solve:
-
-**Problem 1 — Trace ID delivery.** When the Jaeger datasource drives the panel in Explore, the trace ID must arrive via a DataFrame field, not panel options. The panel needs a second rendering path alongside the panel-options path.
-
-**Problem 2 — Iframe base URL.** The panel must know what URL to put in the `<iframe src>`. `instanceSettings.url` is the Grafana backend proxy path (e.g. `/api/datasources/proxy/uid/abc123`) — usable for JSON API calls but not for iframe navigation. The original Jaeger URL (e.g. `http://jaeger:16686`) is stored server-side only and not readable by frontend plugin JS.
-
-This second problem has no clean solution in Phase 2 — Phase 2 is explicitly **direct mode only**. The user must still configure `jaegerBaseUrl` in the panel options; the datasource is responsible for API calls but the iframe still navigates the browser directly to the Jaeger domain. This is the same browser-to-Jaeger requirement as before Phase 2; it is the SSO-breaking constraint that Phase 3's Go binary resolves by serving the iframe from the Grafana origin.
-
-Phase 2 therefore improves UX (trace IDs flow through the datasource, no manual copy-paste) but does not change the deployment constraint.
-
-**Remaining tasks:**
-
-1. **Datasource: set `preferredVisualisationPluginId` on DataFrames** (`datasource.ts`):
-   - In `fetchTraces()` and `fetchTrace()`, set `frame.meta = { preferredVisualisationPluginId: 'jaegertracing-jaeger-panel' }` so Explore routes results to the Jaeger panel automatically rather than the default table/trace renderer.
-
-2. **Panel: add DataFrame-driven rendering path** (`JaegerPanel.tsx`):
-   - When `data.series` is non-empty and the first frame contains a `traceID` field with exactly one row, render the trace iframe using `jaegerBaseUrl` from panel options as the base and the `traceID` field value as the trace ID. This replaces manual trace-ID entry in panel options for the Explore flow.
-   - When the frame contains multiple rows (search results list), render them as a table. Clicking a row fires the data link (see next task).
-   - Fall back to the full panel-options path (existing behaviour) when no DataFrames are present — dashboard use case with `$traceId` variable.
-
-3. **Datasource: search results drill-down via data links** (`datasource.ts`):
-   - In `fetchTraces()`, add an internal data link on the `traceID` field: `field.config.links = [{ title: 'View trace', url: '', internal: { datasourceUid: this.uid, query: { queryType: 'trace', traceId: '${__value.raw}' } } }]`.
-   - When clicked in Explore this fires `splitOpen()` — a second Explore pane runs a trace-ID query, returns a single-row frame, and the panel renders the trace iframe.
-
-4. **Variable support** (`VariableEditor.tsx`): populate dashboard variables from `/api/services` or `/api/services/{service}/operations`.
-
-5. **CI Playwright tests** (extend `tests/panel.spec.ts`):
-   - `testDatasource()`: provision datasource, click "Save & Test", assert success banner.
-   - Service dropdown populates: open Explore with datasource, assert at least one option in Service select.
-   - Search results appear: select service "frontend", run query, assert results table renders with at least one `traceID` row.
-   - Trace iframe: provision a dashboard panel with `jaegerBaseUrl` and `$traceId` variable set from a real HotROD trace, assert the `<iframe src>` matches `{baseUrl}/trace/{traceId}?uiEmbed=v0`.
-   - Note: asserting content *inside* the iframe is impossible due to cross-origin restrictions. Drill-down via the data link (splitOpen → second pane → iframe) must be verified manually.
-
-**Exit criterion:** In Grafana Explore, selecting the Jaeger datasource, picking a service, and running a query shows a results table with trace IDs. Clicking a trace ID opens a second Explore pane and renders the Jaeger trace iframe (Jaeger must be browser-reachable in this phase). CI passes. No Go code required.
+**Exit criterion met:** Grafana Explore with the Jaeger datasource shows a search results table with trace IDs. Clicking a trace ID either opens it inline on the dashboard or in a second Explore pane. CI passes.
 
 ---
 
