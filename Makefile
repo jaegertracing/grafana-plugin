@@ -1,10 +1,7 @@
-.PHONY: build dev test lint server e2e
+.PHONY: build dev test lint server e2e panel-% datasource-%
 
 build:
 	npm run build
-
-dev:
-	npm run dev
 
 test:
 	npm run test:ci
@@ -12,8 +9,8 @@ test:
 lint:
 	npm run lint
 
-server:
-	npm run server
+panel-%:
+	npm run $* --workspace=packages/panel
 
-e2e:
-	npm run e2e
+datasource-%:
+	npm run $* --workspace=packages/datasource
