@@ -11,11 +11,11 @@ import { lastValueFrom } from 'rxjs';
 import { JaegerDataSourceOptions, JaegerQuery } from '../types';
 
 export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourceOptions> {
-  jaegerUrl: string;
+  proxyUrl: string;
 
   constructor(instanceSettings: DataSourceInstanceSettings<JaegerDataSourceOptions>) {
     super(instanceSettings);
-    this.jaegerUrl = instanceSettings.jsonData.jaegerUrl ?? '';
+    this.proxyUrl = instanceSettings.url ?? '';
   }
 
   async query(request: DataQueryRequest<JaegerQuery>): Promise<DataQueryResponse> {
@@ -40,7 +40,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
   private async fetchTrace(traceId: string): Promise<MutableDataFrame[]> {
     const response = await lastValueFrom(
       getBackendSrv().fetch<{ data: unknown[] }>({
-        url: `${this.url}/api/traces/${encodeURIComponent(traceId)}`,
+        url: `${this.proxyUrl}/api/traces/${encodeURIComponent(traceId)}`,
       })
     );
     const frame = new MutableDataFrame({
@@ -71,7 +71,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
     const response = await lastValueFrom(
       getBackendSrv().fetch<{ data: Array<{ traceID: string; spans: unknown[] }> }>({
-        url: `${this.url}/api/traces?${params}`,
+        url: `${this.proxyUrl}/api/traces?${params}`,
       })
     );
 
@@ -97,7 +97,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     try {
       await lastValueFrom(
         getBackendSrv().fetch({
-          url: `${this.url}/api/services`,
+          url: `${this.proxyUrl}/api/services`,
         })
       );
       return { status: 'success', message: 'Successfully connected to Jaeger' };
@@ -110,7 +110,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
   async getServices(): Promise<string[]> {
     const response = await lastValueFrom(
       getBackendSrv().fetch<{ data: string[] }>({
-        url: `${this.url}/api/services`,
+        url: `${this.proxyUrl}/api/services`,
       })
     );
     return response.data.data ?? [];
@@ -119,7 +119,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
   async getOperations(service: string): Promise<string[]> {
     const response = await lastValueFrom(
       getBackendSrv().fetch<{ data: string[] }>({
-        url: `${this.url}/api/services/${encodeURIComponent(service)}/operations`,
+        url: `${this.proxyUrl}/api/services/${encodeURIComponent(service)}/operations`,
       })
     );
     return response.data.data ?? [];
