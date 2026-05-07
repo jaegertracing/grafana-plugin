@@ -17,12 +17,25 @@ function resolveBase(raw: string): string | null {
   return trimmed;
 }
 
+function traceEmbedParams(options: JaegerPanelOptions): URLSearchParams {
+  const params = new URLSearchParams({ uiEmbed: 'v0' });
+  if (options.hideTimelineMinimap) {
+    params.set('uiTimelineHideMinimap', '1');
+  }
+  if (options.hideTimelineSummary) {
+    params.set('uiTimelineHideSummary', '1');
+  }
+  if (options.collapseTraceHeader) {
+    params.set('uiTimelineCollapseTitle', '1');
+  }
+  return params;
+}
+
 function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables']): string | null {
   const base = resolveBase(replaceVariables(options.jaegerBaseUrl));
   if (!base) {
     return null;
   }
-  const params = new URLSearchParams({ uiEmbed: 'v0' });
 
   switch (options.mode) {
     case 'trace': {
@@ -30,16 +43,7 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
       if (!traceId) {
         return null;
       }
-      if (options.hideTimelineMinimap) {
-        params.set('uiTimelineHideMinimap', '1');
-      }
-      if (options.hideTimelineSummary) {
-        params.set('uiTimelineHideSummary', '1');
-      }
-      if (options.collapseTraceHeader) {
-        params.set('uiTimelineCollapseTitle', '1');
-      }
-      return `${base}/trace/${encodeURIComponent(traceId)}?${params}`;
+      return `${base}/trace/${encodeURIComponent(traceId)}?${traceEmbedParams(options)}`;
     }
 
     case 'diff': {
@@ -48,16 +52,7 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
       if (!traceId || !traceIdB) {
         return null;
       }
-      if (options.hideTimelineMinimap) {
-        params.set('uiTimelineHideMinimap', '1');
-      }
-      if (options.hideTimelineSummary) {
-        params.set('uiTimelineHideSummary', '1');
-      }
-      if (options.collapseTraceHeader) {
-        params.set('uiTimelineCollapseTitle', '1');
-      }
-      return `${base}/trace/${encodeURIComponent(traceId)}...${encodeURIComponent(traceIdB)}?${params}`;
+      return `${base}/trace/${encodeURIComponent(traceId)}...${encodeURIComponent(traceIdB)}?${traceEmbedParams(options)}`;
     }
 
     case 'search': {
@@ -106,7 +101,12 @@ function traceIdFromData(data: Props['data']): string | null {
   return null;
 }
 
+// Minimum iframe height ensures the trace view is usable in Explore's split pane,
+// where Grafana allocates only the remaining viewport height after the query builder.
+const MIN_IFRAME_HEIGHT = 600;
+
 export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, replaceVariables }) => {
+  const iframeHeight = Math.max(height, MIN_IFRAME_HEIGHT);
   // DataFrame-driven path: when the Jaeger datasource delivers a single-row trace frame
   // (via Explore or a datasource-linked panel), render the iframe directly from that trace ID.
   // The base URL still comes from panel options — proxy mode (Phase 3) will change this.
@@ -114,22 +114,12 @@ export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, rep
   if (frameTraceId) {
     const base = resolveBase(replaceVariables(options.jaegerBaseUrl));
     if (base) {
-      const params = new URLSearchParams({ uiEmbed: 'v0' });
-      if (options.hideTimelineMinimap) {
-        params.set('uiTimelineHideMinimap', '1');
-      }
-      if (options.hideTimelineSummary) {
-        params.set('uiTimelineHideSummary', '1');
-      }
-      if (options.collapseTraceHeader) {
-        params.set('uiTimelineCollapseTitle', '1');
-      }
-      const url = `${base}/trace/${encodeURIComponent(frameTraceId)}?${params}`;
+      const url = `${base}/trace/${encodeURIComponent(frameTraceId)}?${traceEmbedParams(options)}`;
       return (
         <iframe
           src={url}
           width={width}
-          height={height}
+          height={iframeHeight}
           style={{ border: 'none', display: 'block' }}
           title="Jaeger Trace"
           data-testid="jaeger-panel-iframe"
@@ -164,7 +154,7 @@ export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, rep
     <iframe
       src={url}
       width={width}
-      height={height}
+      height={iframeHeight}
       style={{ border: 'none', display: 'block' }}
       title="Jaeger Trace"
       data-testid="jaeger-panel-iframe"
