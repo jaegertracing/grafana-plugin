@@ -4,6 +4,5 @@ datasources:
   - name: Jaeger
     type: jaegertracing-jaeger-datasource
     access: proxy
+    url: http://jaeger:16686
     isDefault: true
-    jsonData:
-      jaegerUrl: http://jaeger:16686

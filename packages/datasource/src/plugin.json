@@ -25,13 +25,7 @@
   "routes": [
     {
       "path": "api",
-      "url": "{{ .JsonData.jaegerUrl }}/api",
-      "headers": [
-        {
-          "name": "Content-Type",
-          "content": "application/json"
-        }
-      ]
+      "url": "{{ .URL }}/api"
     }
   ]
 }

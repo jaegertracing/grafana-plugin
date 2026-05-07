@@ -11,11 +11,12 @@ import { lastValueFrom } from 'rxjs';
 import { JaegerDataSourceOptions, JaegerQuery } from '../types';
 
 export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourceOptions> {
-  proxyUrl: string;
+  readonly proxyUrl: string;
 
   constructor(instanceSettings: DataSourceInstanceSettings<JaegerDataSourceOptions>) {
     super(instanceSettings);
-    this.proxyUrl = instanceSettings.url ?? '';
+    // instanceSettings.url is the Grafana backend proxy URL for this datasource
+    this.proxyUrl = instanceSettings.url!;
   }
 
   async query(request: DataQueryRequest<JaegerQuery>): Promise<DataQueryResponse> {
