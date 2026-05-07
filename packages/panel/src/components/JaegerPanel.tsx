@@ -1,5 +1,5 @@
 import React from 'react';
-import { PanelProps } from '@grafana/data';
+import { FieldType, PanelProps } from '@grafana/data';
 import { JaegerPanelOptions } from 'types';
 
 type Props = PanelProps<JaegerPanelOptions>;
@@ -62,7 +62,7 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
 
     case 'search': {
       // Jaeger auto-submits the search query on load; without a service it errors immediately.
-      // Until jaeger-ui suppresses the auto-query in embed mode (Phase 2), require a service.
+      // Until jaeger-ui suppresses the auto-query in embed mode (Phase 4), require a service.
       const service = replaceVariables(options.service ?? '').trim();
       if (!service) {
         return null;
@@ -90,7 +90,55 @@ function hint(options: JaegerPanelOptions, replaceVariables: Props['replaceVaria
   return 'Enter a Trace ID in panel options.';
 }
 
-export const JaegerPanel: React.FC<Props> = ({ options, width, height, replaceVariables }) => {
+// Extract a single trace ID from a DataFrame delivered by the Jaeger datasource.
+// Returns null if the frame has zero rows or more than one row (multi-row = search results,
+// handled separately by the datasource's data links / splitOpen flow).
+function traceIdFromData(data: Props['data']): string | null {
+  for (const frame of data.series) {
+    const field = frame.fields.find((f) => f.name === 'traceID' && f.type === FieldType.string);
+    if (field && frame.length === 1) {
+      const value = field.values.get ? field.values.get(0) : (field.values as unknown as string[])[0];
+      if (typeof value === 'string' && value) {
+        return value;
+      }
+    }
+  }
+  return null;
+}
+
+export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, replaceVariables }) => {
+  // DataFrame-driven path: when the Jaeger datasource delivers a single-row trace frame
+  // (via Explore or a datasource-linked panel), render the iframe directly from that trace ID.
+  // The base URL still comes from panel options — proxy mode (Phase 3) will change this.
+  const frameTraceId = traceIdFromData(data);
+  if (frameTraceId) {
+    const base = resolveBase(replaceVariables(options.jaegerBaseUrl));
+    if (base) {
+      const params = new URLSearchParams({ uiEmbed: 'v0' });
+      if (options.hideTimelineMinimap) {
+        params.set('uiTimelineHideMinimap', '1');
+      }
+      if (options.hideTimelineSummary) {
+        params.set('uiTimelineHideSummary', '1');
+      }
+      if (options.collapseTraceHeader) {
+        params.set('uiTimelineCollapseTitle', '1');
+      }
+      const url = `${base}/trace/${encodeURIComponent(frameTraceId)}?${params}`;
+      return (
+        <iframe
+          src={url}
+          width={width}
+          height={height}
+          style={{ border: 'none', display: 'block' }}
+          title="Jaeger Trace"
+          data-testid="jaeger-panel-iframe"
+        />
+      );
+    }
+  }
+
+  // Panel-options path: dashboard panels with $traceId variable, search mode, diff mode.
   const url = buildUrl(options, replaceVariables);
 
   if (!url) {

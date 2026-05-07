@@ -51,3 +51,27 @@ test('trace mode renders iframe with correct src when trace ID is set', async ({
   await expect(iframe).toHaveAttribute('src', /\/trace\/abc123/);
   await expect(iframe).toHaveAttribute('src', /uiEmbed=v0/);
 });
+
+test('datasource testDatasource succeeds', async ({
+  readProvisionedDataSource,
+  gotoDataSourceConfigPage,
+}) => {
+  const datasource = await readProvisionedDataSource({ fileName: 'datasources.yml' });
+  const configPage = await gotoDataSourceConfigPage(datasource.uid);
+  await expect(configPage.saveAndTest()).resolves.toBeDefined();
+  await expect(configPage.page.getByText('Successfully connected to Jaeger')).toBeVisible();
+});
+
+test('datasource QueryEditor service dropdown is populated from live Jaeger API', async ({
+  readProvisionedDataSource,
+  explorePage,
+}) => {
+  const datasource = await readProvisionedDataSource({ fileName: 'datasources.yml' });
+  await explorePage.goto();
+  await explorePage.datasource.set(datasource.name);
+  // The QueryEditor renders a Service select; wait for it to be populated
+  const serviceSelect = explorePage.getQueryEditorRow('A').getByRole('combobox', { name: /service/i });
+  await serviceSelect.click();
+  // At least one option should appear (from the live Jaeger API via proxy)
+  await expect(explorePage.page.getByRole('option').first()).toBeVisible();
+});

@@ -1,4 +1,5 @@
 import {
+  DataLink,
   DataQueryRequest,
   DataQueryResponse,
   DataSourceApi,
@@ -43,6 +44,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     );
     const frame = new MutableDataFrame({
       name: traceId,
+      meta: { preferredVisualisationPluginId: 'jaegertracing-jaeger-panel' },
       fields: [{ name: 'traceID', type: FieldType.string }],
     });
     frame.add({ traceID: traceId });
@@ -79,10 +81,21 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       })
     );
 
+    const traceLink: DataLink = {
+      title: 'View trace',
+      url: '',
+      internal: {
+        datasourceUid: this.uid,
+        datasourceName: this.name,
+        query: { queryType: 'trace', traceId: '${__value.raw}' },
+      },
+    };
+
     const frame = new MutableDataFrame({
       name: 'traces',
+      meta: { preferredVisualisationPluginId: 'jaegertracing-jaeger-panel' },
       fields: [
-        { name: 'traceID', type: FieldType.string },
+        { name: 'traceID', type: FieldType.string, config: { links: [traceLink] } },
         { name: 'spanCount', type: FieldType.number },
       ],
     });
