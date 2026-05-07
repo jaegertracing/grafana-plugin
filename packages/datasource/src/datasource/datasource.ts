@@ -6,7 +6,7 @@ import {
   FieldType,
   MutableDataFrame,
 } from '@grafana/data';
-import { getBackendSrv } from '@grafana/runtime';
+import { getBackendSrv, isFetchError } from '@grafana/runtime';
 import { lastValueFrom } from 'rxjs';
 import { JaegerDataSourceOptions, JaegerQuery } from '../types';
 
@@ -102,7 +102,8 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       );
       return { status: 'success', message: 'Successfully connected to Jaeger' };
     } catch (err) {
-      return { status: 'error', message: `Cannot connect to Jaeger: ${String(err)}` };
+      const msg = isFetchError(err) ? `HTTP ${err.status}: ${err.statusText}` : String(err);
+      return { status: 'error', message: `Cannot connect to Jaeger: ${msg}` };
     }
   }
 
