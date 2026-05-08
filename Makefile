@@ -4,7 +4,7 @@ build: build-backend
 	npm run build
 
 build-backend:
-	(cd packages/datasource && mage build:linux)
+	(cd packages/datasource && mage build:linuxARM64 build:linux)
 
 test:
 	npm run test:ci
