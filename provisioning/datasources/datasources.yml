@@ -9,3 +9,11 @@ datasources:
     isDefault: true
     jsonData:
       proxyMode: false
+
+  - name: Jaeger (proxied)
+    uid: jaeger-proxied
+    type: jaegertracing-jaeger-datasource
+    access: proxy
+    jsonData:
+      proxyMode: true
+      jaegerInternalURL: http://jaeger:16686

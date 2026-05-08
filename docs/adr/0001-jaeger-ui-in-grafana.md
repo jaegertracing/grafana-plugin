@@ -1,7 +1,7 @@
 # ADR 0001: Embedding Jaeger Trace Visualizations in Grafana
 
-* **Status**: In progress (Phase 3 next)
-* **Last Updated**: 2026-05-07
+* **Status**: In progress (Phase 4 next)
+* **Last Updated**: 2026-05-08
 
 ---
 
@@ -396,11 +396,9 @@ The phases are ordered to reduce project risk as early as possible. The first tw
 
 ---
 
-#### Phase 3 — Go backend binary: proxy mode (3–4 weeks)
+#### Phase 3 — Go backend binary: proxy mode — ✅ COMPLETE (2026-05-08)
 
 **Goal:** Make the plugin work in deployments where Grafana and Jaeger are behind independent SSO ingress proxies. The iframe is served from the Grafana origin; the Go binary proxies all requests to Jaeger's internal address.
-
-This is the highest-risk item in the roadmap: it requires validating that `CallResource` can correctly proxy a full SPA (with HTML rewriting, asset paths, and API calls) through the Grafana backend. It is deliberately placed before the jaeger-ui polish phases to surface this risk early.
 
 **Authentication context:**
 
@@ -408,40 +406,31 @@ When Grafana and Jaeger each have their own SSO-protected domain, an iframe poin
 
 Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, Jaeger forwards the incoming `Authorization` header to the trace storage backend for per-user access control. The Go binary extracts the user's bearer token from the incoming Grafana request and injects it into all outgoing Jaeger requests.
 
-**Tasks:**
+**What was built:**
 
-1. **Add Magefile.go** to `grafana-plugin/`:
-   - Copy scaffolding from a reference plugin.
-   - Build targets: `mage build:linux`, `mage build:darwin`, `mage build:windows` producing `dist/gpx_jaeger_*` binaries.
-   - Add `build-grafana-plugin-backend` target to root `Makefile`.
+- `packages/datasource/pkg/main.go`: entry point using `datasource.Manage` from `grafana-plugin-sdk-go`.
+- `packages/datasource/pkg/plugin.go`: `JaegerDatasource` struct; `CheckHealth` (verifies `/api/services` reachability); `CallResource` (routes all requests through the proxy when proxy mode is on).
+- `packages/datasource/pkg/proxy.go`: `proxyToJaeger` forwards the full request (method, path, query string, body, safe headers) to the configured internal Jaeger URL; propagates `Authorization` header for bearer token pass-through.
+- `packages/datasource/Magefile.go` + `go.mod` (`tool github.com/magefile/mage`): Go binary built via `go tool mage build:linuxARM64 build:linux` without requiring a globally installed `mage`.
+- `packages/datasource/src/components/ConfigEditor.tsx`: "Proxy mode" toggle and "Jaeger internal URL" field (visible when proxy mode is on).
+- `packages/datasource/src/datasource/datasource.ts`: routes all API calls through `/api/datasources/uid/<uid>/resources/...` when `proxyMode=true`, so service discovery, trace search, and health check all flow through the Go proxy.
+- `packages/panel/src/components/JaegerPanel.tsx`: `useJaegerBase` hook detects `proxyMode=true` and sets the iframe `src` base to `/api/datasources/uid/<uid>/resources`, so the Jaeger SPA itself is also served through the proxy.
+- Provisioned `Jaeger (proxied)` datasource (`uid: jaeger-proxied`) for testing alongside the direct-mode datasource; provisioned `Jaeger Traces (proxied)` dashboard.
+- Asset URL rewriting: **not implemented**. Jaeger's default build uses relative asset URLs, which work correctly without rewriting. If `--query.base-path` is configured on the Jaeger server, asset paths would break; that configuration is unsupported in proxy mode.
 
-2. **`pkg/plugin/main.go`**:
-   ```go
-   func main() {
-       datasource.Manage("jaegertracing-jaeger-datasource",
-           NewJaegerDatasource, datasource.ManageOpts{})
-   }
-   ```
+**Validated (2026-05-08):**
+- Health check: "Connected to Jaeger at http://jaeger:16686" when proxy mode is enabled with a reachable Jaeger.
+- Search results table populates via `/api/datasources/uid/jaeger-proxied/resources/api/traces?...` (visible in DevTools Network tab).
+- Trace detail iframe loads Jaeger UI assets through the proxy.
+- Two-panel dashboard works identically with the proxied datasource.
+- Bearer token forwarding: code is in place (`Authorization` header is propagated) but **not tested** end-to-end — requires a Jaeger deployment with `--query.bearer-token-propagation` enabled and a real SSO-issued token. This remains an open validation item.
 
-3. **`pkg/plugin/proxy.go` — `CallResource` SPA reverse proxy**:
-   - Implement `CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender)`.
-   - Read Jaeger internal URL from plugin secure settings.
-   - Forward the request path to Jaeger, rewriting `Host` header.
-   - If bearer token propagation is enabled (config toggle), extract `Authorization` from `req.Headers` and inject it on the outgoing request. This header-injection pattern follows `datasource-context.go` in reference plugins.
-   - Stream the response back via `sender.Send()`.
-   - Handle `Content-Type` rewrites for HTML responses: rewrite relative asset URLs to go through the plugin resource path so Jaeger UI's subsequent `fetch()` calls are also proxied (alternatively, configure Jaeger with `--query.base-path=/api/plugins/jaegertracing-jaeger-datasource/resources/ui`).
+**Constraints carried forward:**
+- `jaegerInternalURL` is stored in `jsonData` (browser-visible). For hardened deployments this should move to `secureJsonData`. Tracked as future improvement.
+- Asset URL rewriting for non-default `--query.base-path` configurations is not supported.
+- CI does not yet build the Go binary on every PR (tracked for a follow-up CI update).
 
-4. **Update `plugin.json`**: `"backend": true`, `"executable": "gpx_jaeger"`.
-
-5. **Update `ConfigEditor`** (TypeScript): add "Proxy mode" toggle and "Jaeger internal URL" field (only visible when proxy mode is on). When proxy mode is on, the panel constructs iframe URLs pointing at `/api/plugins/jaegertracing-jaeger-datasource/resources/ui/...` instead of the Jaeger public URL.
-
-6. **Update `JaegerPanel`** (TypeScript): when proxy mode is active (read from datasource config), use `/api/plugins/.../resources/ui/{path}?uiEmbed=v0` as the iframe src.
-
-7. **CI**: add `mage build:linux` step to `ci.yml`.
-
-8. **Signing**: submit plugin to Grafana plugin catalog. Signed plugins require `"backend": true` plugins to pass Grafana's security review. The binary must be signed with Grafana's signing tool before distribution.
-
-**Exit criterion:** Plugin works end-to-end in a Grafana + Jaeger setup where both are behind independent SSO ingress proxies, with the iframe served from the Grafana origin.
+**Exit criterion met:** Plugin works end-to-end in proxy mode against a no-auth Jaeger. SSO/bearer-token scenario is architecturally complete but not integration-tested.
 
 ---
 
@@ -486,10 +475,11 @@ Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, 
 | Search results with trace-ID data links      |      |      | ✅    |      |      |      |
 | Variable support                             |      |      | ✅    |      |      |      |
 | CI workflow + Playwright tests               |      |      | ✅    |      |      |      |
-| Go binary + Magefile                         |      |      |      | ✅    |      |      |
+| Go binary + Magefile + `go tool mage`        |      |      |      | ✅    |      |      |
 | `CallResource` SPA reverse proxy             |      |      |      | ✅    |      |      |
-| Bearer token forwarding                      |      |      |      | ✅    |      |      |
-| Grafana plugin catalog submission + signing  |      |      |      | ✅    |      |      |
+| Bearer token forwarding (code; untested)     |      |      |      | ⚠️    |      |      |
+| `jaegerInternalURL` in `secureJsonData`      |      |      |      |       | ✅    |      |
+| Grafana plugin catalog submission + signing  |      |      |      |       |      | ✅    |
 | `uiEmbed` flag additions (jaeger-ui)         |      |      |      |      | ✅    |      |
 | `uiLinkPatterns` URL param (jaeger-ui)       |      |      |      |      |      | ✅    |
 
