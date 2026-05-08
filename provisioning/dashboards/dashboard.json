@@ -71,8 +71,8 @@
     },
     {
       "datasource": {
-        "type": "grafana",
-        "uid": "-- Grafana --"
+        "type": "jaegertracing-jaeger-datasource",
+        "uid": "jaeger"
       },
       "fieldConfig": {
         "defaults": {},

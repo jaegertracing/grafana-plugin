@@ -46,8 +46,8 @@ function resolveBaseFromDatasource(uid: string | undefined): string | null {
 }
 
 function getBase(data: Props['data'], options: JaegerPanelOptions): string | null {
-  // Prefer the uid from the live query (Explore / datasource-linked panels), fall back to
-  // the uid in panel options (dashboard panels driven by a $traceId variable).
+  // Prefer uid from data.request (set by Grafana from the panel's configured datasource).
+  // Fall back to options.datasourceUid for Explore, where data.request may not be populated yet.
   const uid = data.request?.targets?.[0]?.datasource?.uid ?? options.datasourceUid;
   return resolveBaseFromDatasource(uid);
 }
