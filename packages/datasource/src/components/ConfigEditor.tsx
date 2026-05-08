@@ -34,7 +34,7 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
           <InlineField
             label="Jaeger internal URL"
             labelWidth={20}
-            tooltip="Internal address of the Jaeger query service reachable from the Grafana server (e.g. http://jaeger:16686). Not exposed to the browser."
+            tooltip="Internal address of the Jaeger query service reachable from the Grafana server (e.g. http://jaeger:16686). Used by the Go backend proxy only."
           >
             <Input
               value={jsonData.jaegerInternalURL ?? ''}
