@@ -71,7 +71,7 @@ func (d *JaegerDatasource) CheckHealth(ctx context.Context, _ *backend.CheckHeal
 
 // CallResource proxies all requests through to Jaeger in proxy mode.
 // The TypeScript frontend routes iframe navigation and API calls through
-// /api/plugins/jaegertracing-jaeger-datasource/resources/... when proxy mode is on.
+// /api/datasources/uid/<uid>/resources/... when proxy mode is on.
 func (d *JaegerDatasource) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
 	if !d.config.ProxyMode {
 		return sender.Send(&backend.CallResourceResponse{
