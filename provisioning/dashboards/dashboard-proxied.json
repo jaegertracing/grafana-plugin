@@ -58,7 +58,7 @@
         {
           "datasource": {
             "type": "jaegertracing-jaeger-datasource",
-            "uid": "jaeger"
+            "uid": "jaeger-proxied"
           },
           "queryType": "search",
           "service": "${service}",
