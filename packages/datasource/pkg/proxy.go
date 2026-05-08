@@ -15,7 +15,7 @@ import (
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
-// proxyToJaeger forwards a CallResource request to the Jaeger backend and streams the response back.
+// proxyToJaeger forwards a CallResource request to the Jaeger backend and buffers the full response before sending.
 //
 // URL mapping: Grafana routes /api/datasources/uid/<uid>/resources/<path> to CallResource with
 // req.Path = <path>. We forward to <jaegerURL>/<path>, preserving the query string and body.
@@ -49,7 +49,7 @@ func proxyToJaeger(ctx context.Context, jaegerURL *url.URL, req *backend.CallRes
 			outReq.Header.Set(h, v[0])
 		}
 	}
-	outReq.Header.Set("X-Forwarded-For", "grafana-proxy")
+	outReq.Header.Set("Via", "grafana-jaeger-proxy")
 
 	resp, err := httpClient.Do(outReq)
 	if err != nil {
