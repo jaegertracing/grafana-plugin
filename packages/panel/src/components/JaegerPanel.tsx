@@ -112,7 +112,10 @@ function useJaegerBase(
   options: JaegerPanelOptions,
   replaceVariables: Props['replaceVariables']
 ): string | null {
-  const uid = data.request?.targets?.[0]?.datasource?.uid;
+  // Prefer the uid from the live query (Explore / datasource-linked panels), fall back to
+  // the uid explicitly configured in panel options (dashboard static-variable panels where
+  // data.request carries no datasource context).
+  const uid = data.request?.targets?.[0]?.datasource?.uid ?? options.datasourceUid;
   // Start as undefined (loading) when there is a datasource uid to look up, so we never
   // briefly load from the wrong origin before the async lookup resolves (important in SSO /
   // proxy-mode deployments). When there is no uid we know immediately it is direct mode.
