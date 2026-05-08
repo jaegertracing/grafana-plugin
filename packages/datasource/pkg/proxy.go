@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 )
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
@@ -53,9 +54,12 @@ func proxyToJaeger(ctx context.Context, jaegerURL *url.URL, req *backend.CallRes
 
 	resp, err := httpClient.Do(outReq)
 	if err != nil {
+		// Log the detailed error server-side; return a generic message to avoid leaking
+		// internal hostnames or network topology to browser clients.
+		log.DefaultLogger.Error("jaeger proxy: upstream request failed", "error", err)
 		return sender.Send(&backend.CallResourceResponse{
 			Status: 502,
-			Body:   []byte(fmt.Sprintf("upstream error: %v", err)),
+			Body:   []byte("bad gateway: could not reach Jaeger upstream"),
 		})
 	}
 	defer resp.Body.Close()
