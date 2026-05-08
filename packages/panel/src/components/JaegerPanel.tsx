@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { FieldType, PanelProps } from '@grafana/data';
 import { getDataSourceSrv } from '@grafana/runtime';
 import { JaegerPanelOptions } from 'types';
@@ -107,45 +107,20 @@ const MIN_IFRAME_HEIGHT = 600;
 
 // Resolve the iframe base URL from the datasource settings when available (proxy mode),
 // falling back to the panel option jaegerBaseUrl (direct mode).
+// Resolve the iframe base URL synchronously from datasource instance settings.
+// Prefers the uid from the live query (Explore), falls back to the uid set in panel options
+// (dashboard panels driven by a $traceId variable with no active query).
 function useJaegerBase(
   data: Props['data'],
   options: JaegerPanelOptions,
   replaceVariables: Props['replaceVariables']
 ): string | null {
-  // Prefer the uid from the live query (Explore / datasource-linked panels), fall back to
-  // the uid explicitly configured in panel options (dashboard static-variable panels where
-  // data.request carries no datasource context).
   const uid = data.request?.targets?.[0]?.datasource?.uid ?? options.datasourceUid;
-  // Start as undefined (loading) when there is a datasource uid to look up, so we never
-  // briefly load from the wrong origin before the async lookup resolves (important in SSO /
-  // proxy-mode deployments). When there is no uid we know immediately it is direct mode.
-  const [proxyBase, setProxyBase] = useState<string | null | undefined>(uid ? undefined : null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const lookup = uid
-      ? getDataSourceSrv()
-          .get(uid)
-          .then((ds) => {
-            const jsonData = (ds as any).instanceSettings?.jsonData ?? {};
-            return jsonData.proxyMode ? `/api/datasources/uid/${uid}/resources` : null;
-          })
-      : Promise.resolve(null);
-
-    lookup
-      .then((base) => { if (!cancelled) { setProxyBase(base); } })
-      .catch(() => { if (!cancelled) { setProxyBase(null); } });
-
-    return () => { cancelled = true; };
-  }, [uid]);
-
-  // While the async lookup is in flight, return null to suppress iframe rendering
-  // rather than briefly loading from the wrong origin.
-  if (proxyBase === undefined) {
-    return null;
-  }
-  if (proxyBase !== null) {
-    return proxyBase;
+  if (uid) {
+    const jsonData = getDataSourceSrv().getInstanceSettings(uid)?.jsonData as any;
+    if (jsonData?.proxyMode) {
+      return `/api/datasources/uid/${uid}/resources`;
+    }
   }
   return resolveBase(replaceVariables(options.jaegerBaseUrl));
 }
