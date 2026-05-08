@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -16,8 +17,12 @@ var httpClient = &http.Client{Timeout: 30 * time.Second}
 
 // proxyToJaeger forwards a CallResource request to the Jaeger backend and streams the response back.
 //
-// URL mapping: Grafana routes /api/plugins/<id>/resources/<path> to CallResource with req.Path = <path>.
-// We forward to <jaegerURL>/<path>, preserving the query string and relevant headers.
+// URL mapping: Grafana routes /api/datasources/uid/<uid>/resources/<path> to CallResource with
+// req.Path = <path>. We forward to <jaegerURL>/<path>, preserving the query string and body.
+//
+// Asset URL rewriting: the proxy does NOT rewrite HTML asset paths. For the Jaeger SPA to load
+// correctly all assets must be relative (which they are by default). If Jaeger is configured with
+// --query.base-path, that same path must match the prefix used here.
 //
 // Bearer token propagation: if Grafana passes an Authorization header (from the user's session),
 // we forward it to Jaeger so --query.bearer-token-propagation can enforce per-user storage access.
@@ -29,7 +34,11 @@ func proxyToJaeger(ctx context.Context, jaegerURL *url.URL, req *backend.CallRes
 		target.RawQuery = ""
 	}
 
-	outReq, err := http.NewRequestWithContext(ctx, req.Method, target.String(), nil)
+	var body io.Reader
+	if len(req.Body) > 0 {
+		body = bytes.NewReader(req.Body)
+	}
+	outReq, err := http.NewRequestWithContext(ctx, req.Method, target.String(), body)
 	if err != nil {
 		return fmt.Errorf("building proxy request: %w", err)
 	}
@@ -51,7 +60,7 @@ func proxyToJaeger(ctx context.Context, jaegerURL *url.URL, req *backend.CallRes
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("reading upstream response: %w", err)
 	}
@@ -64,7 +73,7 @@ func proxyToJaeger(ctx context.Context, jaegerURL *url.URL, req *backend.CallRes
 	return sender.Send(&backend.CallResourceResponse{
 		Status:  resp.StatusCode,
 		Headers: headers,
-		Body:    body,
+		Body:    respBody,
 	})
 }
 
