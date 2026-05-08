@@ -79,5 +79,7 @@ func (d *JaegerDatasource) CallResource(ctx context.Context, req *backend.CallRe
 			Body:   []byte("proxy mode is not enabled"),
 		})
 	}
-	return proxyToJaeger(ctx, d.jaegerURL, req, sender)
+	uid := req.PluginContext.DataSourceInstanceSettings.UID
+	proxyBase := "/api/datasources/uid/" + uid + "/resources"
+	return proxyToJaeger(ctx, d.jaegerURL, proxyBase, req, sender)
 }

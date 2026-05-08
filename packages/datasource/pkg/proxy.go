@@ -21,13 +21,13 @@ var httpClient = &http.Client{Timeout: 30 * time.Second}
 // URL mapping: Grafana routes /api/datasources/uid/<uid>/resources/<path> to CallResource with
 // req.Path = <path>. We forward to <jaegerURL>/<path>, preserving the query string and body.
 //
-// Asset URL rewriting: the proxy does NOT rewrite HTML asset paths. For the Jaeger SPA to load
-// correctly all assets must be relative (which they are by default). If Jaeger is configured with
-// --query.base-path, that same path must match the prefix used here.
+// Base path rewriting: Jaeger's index.html contains <base href="/" data-inject-target="BASE_URL">.
+// We rewrite it to <base href="<proxyBase>/"> so the SPA resolves all relative asset and API URLs
+// through the Grafana proxy rather than the browser root.
 //
 // Bearer token propagation: if Grafana passes an Authorization header (from the user's session),
 // we forward it to Jaeger so --query.bearer-token-propagation can enforce per-user storage access.
-func proxyToJaeger(ctx context.Context, jaegerURL *url.URL, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
+func proxyToJaeger(ctx context.Context, jaegerURL *url.URL, proxyBase string, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
 	target := *jaegerURL
 	target.Path = strings.TrimSuffix(target.Path, "/") + "/" + strings.TrimPrefix(req.Path, "/")
 	target.RawQuery = req.URL[strings.Index(req.URL, "?")+1:]
@@ -69,10 +69,24 @@ func proxyToJaeger(ctx context.Context, jaegerURL *url.URL, req *backend.CallRes
 		return fmt.Errorf("reading upstream response: %w", err)
 	}
 
+	// Rewrite <base href="/" data-inject-target="BASE_URL"> in HTML responses so the Jaeger SPA
+	// resolves all relative asset and API URLs through the Grafana proxy path.
+	if strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
+		respBody = []byte(strings.ReplaceAll(
+			string(respBody),
+			`<base href="/" data-inject-target="BASE_URL" />`,
+			`<base href="`+proxyBase+`/" data-inject-target="BASE_URL" />`,
+		))
+	}
+
 	headers := make(map[string][]string)
 	for k, v := range resp.Header {
 		headers[k] = v
 	}
+	// Grafana adds Content-Security-Policy: sandbox to all CallResource responses, which
+	// blocks script execution in the proxied Jaeger SPA. Remove it so the browser applies
+	// the parent frame's CSP instead.
+	delete(headers, "Content-Security-Policy")
 
 	return sender.Send(&backend.CallResourceResponse{
 		Status:  resp.StatusCode,

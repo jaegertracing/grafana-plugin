@@ -30,9 +30,8 @@ function resolveBaseFromDatasource(uid: string | undefined): string | null {
   if (!jsonData) {
     return null;
   }
-  if (jsonData.proxyMode) {
-    return `/api/datasources/uid/${uid}/resources`;
-  }
+  // Always use jaegerPublicURL for iframe src — CallResource cannot serve SPA due to CSP sandbox.
+  // Proxy mode only affects the datasource's API calls, not the panel iframe.
   const publicUrl = (jsonData.jaegerPublicURL ?? '').trim().replace(/\/$/, '');
   try {
     const parsed = new URL(publicUrl);

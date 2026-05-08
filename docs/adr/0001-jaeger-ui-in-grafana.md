@@ -421,16 +421,58 @@ Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, 
 **Validated (2026-05-08):**
 - Health check: "Connected to Jaeger at http://jaeger:16686" when proxy mode is enabled with a reachable Jaeger.
 - Search results table populates via `/api/datasources/uid/jaeger-proxied/resources/api/traces?...` (visible in DevTools Network tab).
-- Trace detail iframe loads Jaeger UI assets through the proxy.
-- Two-panel dashboard works identically with the proxied datasource.
+- Two-panel dashboard works identically with the proxied datasource for API calls.
 - Bearer token forwarding: code is in place (`Authorization` header is propagated) but **not tested** end-to-end — requires a Jaeger deployment with `--query.bearer-token-propagation` enabled and a real SSO-issued token. This remains an open validation item.
+
+**Critical limitation discovered: CallResource CSP sandbox blocks SPA proxying**
+
+Grafana unconditionally adds `Content-Security-Policy: sandbox` to every `CallResource` response in `pkg/plugins/manager/client/client.go:SetCSPHeader`. The `sandbox` directive prohibits script execution regardless of what the plugin returns. This makes it impossible to serve the Jaeger SPA (which requires JavaScript execution) through `CallResource`.
+
+What this means in practice:
+- **API proxy works**: datasource TypeScript routes `/api/traces`, `/api/services` etc. through `CallResource` — these are JSON responses with no script execution, so the `sandbox` CSP does not affect them. Proxy mode for datasource API calls is fully functional.
+- **SPA proxy does not work**: the iframe `src` cannot be set to `/api/datasources/uid/<uid>/resources/...` because Grafana will sandbox the HTML response, blocking all JavaScript and breaking the Jaeger UI. The iframe must load from a browser-reachable Jaeger origin.
+
+**Revised scope of proxy mode:**
+
+Proxy mode as implemented provides:
+1. Datasource API calls (`/api/traces`, `/api/services`, `/api/operations`) routed server-side through the Go binary — works correctly.
+2. Go backend health check against the internal Jaeger URL — works correctly.
+3. Bearer token forwarding from Grafana user session to Jaeger backend — in place, untested.
+
+Proxy mode does **not** solve the SSO iframe problem. In SSO deployments where Jaeger is not browser-accessible, the iframe will fail. Solving the iframe SSO problem requires an external proxy that sits outside Grafana's request pipeline (see below).
+
+**Why an App Plugin does not solve the SPA proxy problem**
+
+Investigation of the Grafana source code (v12) confirms that the CSP sandbox is applied universally across all Grafana proxy mechanisms:
+
+- **CallResource** (`/api/datasources/uid/<uid>/resources/*` and `/api/plugins/<id>/resources/*`): `pkg/plugins/manager/client/client.go:SetCSPHeader` unconditionally sets `Content-Security-Policy: sandbox` on the first stream response, for both datasource and app plugins.
+- **DataProxy** (`/api/datasources/proxy/uid/<uid>/*`): `pkg/util/proxyutil/reverse_proxy.go:modifyResponse` calls `client.SetCSPHeader` on every proxied response via `NewReverseProxy`.
+- **App Plugin frontend routes** (`/a/<plugin-id>/*`): these serve `hs.Index` (the Grafana shell rendering the plugin's React component), not a raw HTTP proxy. They cannot proxy Jaeger HTML/JS.
+
+There is no Grafana-internal proxy path that can serve JavaScript to an iframe without the `sandbox` CSP directive.
+
+**Path forward for full SSO proxy: external sidecar**
+
+The only way to serve the Jaeger SPA to a browser-embedded iframe without CSP sandbox is a proxy that lives **outside** Grafana's request pipeline. Options:
+
+1. **Dedicated sidecar proxy**: a small HTTP reverse proxy (e.g. nginx, Envoy, or a custom Go binary) deployed alongside Grafana that:
+   - Is accessible from the browser (distinct port or hostname).
+   - Forwards requests to the internal Jaeger URL.
+   - Handles SSO authentication (e.g. validates the user's bearer token before proxying).
+   - The datasource gains a `jaegerProxyURL` field (browser-accessible URL of this sidecar).
+   - The panel iframes from `jaegerProxyURL` instead of `jaegerPublicURL`.
+
+2. **Configure Jaeger with `--query.bearer-token-propagation` + SSO gateway**: route the browser through an SSO-aware reverse proxy (e.g. oauth2-proxy in front of Jaeger) that is browser-accessible and enforces authentication independently. The panel iframes directly to this gateway's URL. This is a deployment-side solution requiring no plugin changes beyond `jaegerPublicURL`.
+
+Option 2 is the lowest-effort path for deployments with an existing SSO gateway infrastructure. Option 1 requires a new deployable artifact.
+
+Both options require changes to the deployment configuration, not to the Grafana plugin itself. The plugin's role is to expose a configurable `jaegerPublicURL` (already implemented) that operators point at whichever SSO-aware Jaeger endpoint they deploy.
 
 **Constraints carried forward:**
 - `jaegerInternalURL` is stored in `jsonData` (browser-visible). For hardened deployments this should move to `secureJsonData`. Tracked as future improvement.
-- Asset URL rewriting for non-default `--query.base-path` configurations is not supported.
 - CI does not yet build the Go binary on every PR (tracked for a follow-up CI update).
 
-**Exit criterion met:** Plugin works end-to-end in proxy mode against a no-auth Jaeger. SSO/bearer-token scenario is architecturally complete but not integration-tested.
+**Exit criterion met (revised):** Proxy mode works for datasource API calls. The SPA proxy requires an App Plugin and is tracked as a future phase.
 
 ---
 
