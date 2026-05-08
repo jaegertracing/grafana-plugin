@@ -112,27 +112,35 @@ function useJaegerBase(
   options: JaegerPanelOptions,
   replaceVariables: Props['replaceVariables']
 ): string | null {
-  const [proxyBase, setProxyBase] = useState<string | null>(null);
+  const uid = data.request?.targets?.[0]?.datasource?.uid;
+  // Start as undefined (loading) when there is a datasource uid to look up, so we never
+  // briefly load from the wrong origin before the async lookup resolves (important in SSO /
+  // proxy-mode deployments). When there is no uid we know immediately it is direct mode.
+  const [proxyBase, setProxyBase] = useState<string | null | undefined>(uid ? undefined : null);
 
   useEffect(() => {
-    const uid = data.request?.targets?.[0]?.datasource?.uid;
-    if (!uid) {
-      setProxyBase(null);
-      return;
-    }
-    getDataSourceSrv()
-      .get(uid)
-      .then((ds) => {
-        const jsonData = (ds as any).instanceSettings?.jsonData ?? {};
-        if (jsonData.proxyMode) {
-          setProxyBase(`/api/datasources/uid/${uid}/resources`);
-        } else {
-          setProxyBase(null);
-        }
-      })
-      .catch(() => setProxyBase(null));
-  }, [data.request?.targets?.[0]?.datasource?.uid]);
+    let cancelled = false;
+    const lookup = uid
+      ? getDataSourceSrv()
+          .get(uid)
+          .then((ds) => {
+            const jsonData = (ds as any).instanceSettings?.jsonData ?? {};
+            return jsonData.proxyMode ? `/api/datasources/uid/${uid}/resources` : null;
+          })
+      : Promise.resolve(null);
 
+    lookup
+      .then((base) => { if (!cancelled) { setProxyBase(base); } })
+      .catch(() => { if (!cancelled) { setProxyBase(null); } });
+
+    return () => { cancelled = true; };
+  }, [uid]);
+
+  // While the async lookup is in flight, return null to suppress iframe rendering
+  // rather than briefly loading from the wrong origin.
+  if (proxyBase === undefined) {
+    return null;
+  }
   if (proxyBase !== null) {
     return proxyBase;
   }
