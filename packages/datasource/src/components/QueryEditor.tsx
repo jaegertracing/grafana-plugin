@@ -28,7 +28,7 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
     if (isLiteralService) {
       datasource.getOperations(query.service!).then(setOperations).catch(() => setOperations([]));
     } else {
-      setOperations([]);
+      Promise.resolve([]).then(setOperations);
     }
   }, [datasource, query.service, services]);
 

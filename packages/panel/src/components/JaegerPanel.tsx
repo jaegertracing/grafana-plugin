@@ -62,9 +62,8 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
       if (!service) {
         return null;
       }
-      params.set('uiSearchHideGraph', '1');
-      params.set('service', service);
-      return `${base}/search?${params}`;
+      const searchParams = new URLSearchParams({ uiEmbed: 'v0', uiSearchHideGraph: '1', service });
+      return `${base}/search?${searchParams}`;
     }
 
     default:
