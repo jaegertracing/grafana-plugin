@@ -7,5 +7,5 @@ import (
 	build "github.com/grafana/grafana-plugin-sdk-go/build"
 )
 
-// Default target: build for the current platform.
+// Default target: build production executables for all supported platforms.
 var Default = build.BuildAll
