@@ -34,13 +34,6 @@ export const plugin = new PanelPlugin<JaegerPanelOptions>(JaegerPanel).setPanelO
       },
     })
     .addTextInput({
-      path: 'jaegerBaseUrl',
-      name: 'Jaeger UI base URL',
-      description: 'Direct URL of the Jaeger Query service (used when no datasource is selected above).',
-      defaultValue: 'http://localhost:16686',
-      showIf: (o) => !o.datasourceUid,
-    })
-    .addTextInput({
       path: 'traceId',
       name: 'Trace ID',
       description: 'Trace ID to display. Supports dashboard variables, e.g. ${traceId}.',

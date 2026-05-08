@@ -22,7 +22,10 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "traceID" },
+            "matcher": {
+              "id": "byName",
+              "options": "traceID"
+            },
             "properties": [
               {
                 "id": "links",
@@ -38,10 +41,17 @@
           }
         ]
       },
-      "gridPos": { "h": 20, "w": 6, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 20,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
       "options": {
-        "footer": { "show": false },
+        "footer": {
+          "show": false
+        },
         "showHeader": true
       },
       "targets": [
@@ -68,17 +78,22 @@
         "defaults": {},
         "overrides": []
       },
-      "gridPos": { "h": 20, "w": 18, "x": 6, "y": 0 },
+      "gridPos": {
+        "h": 20,
+        "w": 18,
+        "x": 6,
+        "y": 0
+      },
       "id": 2,
       "options": {
-        "jaegerBaseUrl": "http://localhost:16686",
         "mode": "trace",
         "traceId": "${traceId}",
         "traceIdB": "",
         "service": "",
         "hideTimelineMinimap": false,
         "hideTimelineSummary": false,
-        "collapseTraceHeader": false
+        "collapseTraceHeader": false,
+        "datasourceUid": "jaeger"
       },
       "targets": [],
       "title": "Trace detail",
@@ -88,11 +103,15 @@
   ],
   "refresh": "",
   "schemaVersion": 39,
-  "tags": ["jaeger"],
+  "tags": [
+    "jaeger"
+  ],
   "templating": {
     "list": [
       {
-        "current": { "value": "" },
+        "current": {
+          "value": ""
+        },
         "hide": 0,
         "label": "Trace ID",
         "name": "traceId",
@@ -102,7 +121,9 @@
         "type": "textbox"
       },
       {
-        "current": { "value": "frontend" },
+        "current": {
+          "value": "frontend"
+        },
         "hide": 0,
         "label": "Service",
         "name": "service",

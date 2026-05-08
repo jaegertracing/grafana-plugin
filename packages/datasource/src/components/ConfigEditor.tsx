@@ -13,12 +13,33 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
     onOptionsChange({ ...options, jsonData: { ...jsonData, proxyMode: e.currentTarget.checked } });
   };
 
+  const onJaegerPublicURLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onOptionsChange({ ...options, jsonData: { ...jsonData, jaegerPublicURL: e.currentTarget.value } });
+  };
+
   const onJaegerInternalURLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onOptionsChange({ ...options, jsonData: { ...jsonData, jaegerInternalURL: e.currentTarget.value } });
   };
 
   return (
     <>
+      {!proxyMode && (
+        <InlineFieldRow>
+          <InlineField
+            label="Jaeger UI URL"
+            labelWidth={20}
+            tooltip="Browser-accessible URL of the Jaeger query service (e.g. http://localhost:16686). The panel iframe loads Jaeger UI directly from this address."
+          >
+            <Input
+              value={jsonData.jaegerPublicURL ?? ''}
+              placeholder="http://localhost:16686"
+              width={40}
+              onChange={onJaegerPublicURLChange}
+            />
+          </InlineField>
+        </InlineFieldRow>
+      )}
+
       <InlineFieldRow>
         <InlineField
           label="Proxy mode"
@@ -34,7 +55,7 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
           <InlineField
             label="Jaeger internal URL"
             labelWidth={20}
-            tooltip="Internal address of the Jaeger query service reachable from the Grafana server (e.g. http://jaeger:16686). Used by the Go backend proxy only."
+            tooltip="Address of the Jaeger query service reachable from the Grafana server (e.g. http://jaeger:16686). Used by the Go backend proxy only."
           >
             <Input
               value={jsonData.jaegerInternalURL ?? ''}

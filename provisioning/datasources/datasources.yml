@@ -9,6 +9,7 @@ datasources:
     isDefault: true
     jsonData:
       proxyMode: false
+      jaegerPublicURL: http://localhost:16686
 
   - name: Jaeger (proxied)
     uid: jaeger-proxied

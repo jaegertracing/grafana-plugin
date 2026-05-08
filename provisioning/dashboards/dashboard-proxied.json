@@ -86,7 +86,6 @@
       },
       "id": 2,
       "options": {
-        "jaegerBaseUrl": "http://localhost:16686",
         "mode": "trace",
         "traceId": "${traceId}",
         "traceIdB": "",

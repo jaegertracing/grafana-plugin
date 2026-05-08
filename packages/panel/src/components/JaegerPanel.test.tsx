@@ -12,7 +12,6 @@ jest.mock('@grafana/runtime', () => ({
 const mockGetDataSourceSrv = getDataSourceSrv as jest.Mock;
 
 const baseOptions: JaegerPanelOptions = {
-  jaegerBaseUrl: 'http://jaeger:16686',
   mode: 'trace',
   traceId: '',
   traceIdB: '',
@@ -41,19 +40,22 @@ const baseProps = {
   eventBus: { subscribe: () => ({ unsubscribe: () => {} }) } as any,
 };
 
+const dsUid = 'test-uid-123';
+
 beforeEach(() => {
   mockGetDataSourceSrv.mockReturnValue({
-    getInstanceSettings: jest.fn().mockReturnValue({ jsonData: { proxyMode: false } }),
+    getInstanceSettings: jest.fn().mockReturnValue({ jsonData: { proxyMode: false, jaegerPublicURL: 'http://jaeger:16686' } }),
   });
 });
 
 describe('JaegerPanel — DataFrame-driven path', () => {
-  it('renders iframe from single-row traceID frame, ignoring panel traceId option', () => {
+  it('renders iframe from single-row traceID frame', () => {
     const frame = toDataFrame({
       name: 'abc123',
       fields: [{ name: 'traceID', type: FieldType.string, values: ['abc123'] }],
     });
-    render(<JaegerPanel {...baseProps} data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }} />);
+    const opts = { ...baseOptions, datasourceUid: dsUid };
+    render(<JaegerPanel {...baseProps} options={opts} data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }} />);
     const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
     expect(iframe.src).toContain('/trace/abc123');
     expect(iframe.src).toContain('uiEmbed=v0');
@@ -67,20 +69,12 @@ describe('JaegerPanel — DataFrame-driven path', () => {
         { name: 'spanCount', type: FieldType.number, values: [3, 5] },
       ],
     });
-    // panel options has no traceId → should show hint
     render(<JaegerPanel {...baseProps} data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }} />);
     expect(screen.getByTestId('jaeger-panel-hint')).toBeInTheDocument();
   });
 
-  it('falls back to panel-options path when no frames are present', () => {
-    const opts = { ...baseOptions, traceId: 'deadbeef' };
-    render(<JaegerPanel {...baseProps} options={opts} />);
-    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
-    expect(iframe.src).toContain('/trace/deadbeef');
-  });
-
   it('applies embed flag options when rendering from DataFrame', () => {
-    const opts = { ...baseOptions, hideTimelineMinimap: true, collapseTraceHeader: true };
+    const opts = { ...baseOptions, datasourceUid: dsUid, hideTimelineMinimap: true, collapseTraceHeader: true };
     const frame = toDataFrame({
       name: 'xyz',
       fields: [{ name: 'traceID', type: FieldType.string, values: ['xyz'] }],
@@ -98,8 +92,7 @@ describe('JaegerPanel — DataFrame-driven path', () => {
   });
 });
 
-describe('JaegerPanel — proxy mode base URL', () => {
-  const dsUid = 'test-uid-123';
+describe('JaegerPanel — base URL from datasource', () => {
   const dataWithTarget = {
     series: [],
     state: LoadingState.Done,
@@ -120,9 +113,9 @@ describe('JaegerPanel — proxy mode base URL', () => {
     expect(iframe.src).toContain('/trace/abc');
   });
 
-  it('falls back to jaegerBaseUrl when datasource has proxyMode=false', () => {
+  it('uses jaegerPublicURL when datasource has proxyMode=false', () => {
     mockGetDataSourceSrv.mockReturnValue({
-      getInstanceSettings: jest.fn().mockReturnValue({ jsonData: { proxyMode: false } }),
+      getInstanceSettings: jest.fn().mockReturnValue({ jsonData: { proxyMode: false, jaegerPublicURL: 'http://jaeger:16686' } }),
     });
 
     const opts = { ...baseOptions, traceId: 'def' };
@@ -134,7 +127,7 @@ describe('JaegerPanel — proxy mode base URL', () => {
     expect(iframe.src).not.toContain('/api/datasources');
   });
 
-  it('falls back to jaegerBaseUrl when getInstanceSettings returns undefined', () => {
+  it('shows hint when getInstanceSettings returns undefined', () => {
     mockGetDataSourceSrv.mockReturnValue({
       getInstanceSettings: jest.fn().mockReturnValue(undefined),
     });
@@ -142,9 +135,7 @@ describe('JaegerPanel — proxy mode base URL', () => {
     const opts = { ...baseOptions, traceId: 'ghi' };
     render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
 
-    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
-    expect(iframe.src).toContain('http://jaeger:16686');
-    expect(iframe.src).toContain('/trace/ghi');
+    expect(screen.getByTestId('jaeger-panel-hint')).toBeInTheDocument();
   });
 
   it('uses proxy base URL when uid comes from panel options (no data.request)', () => {
@@ -158,5 +149,11 @@ describe('JaegerPanel — proxy mode base URL', () => {
     const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
     expect(iframe.src).toContain(`/api/datasources/uid/${dsUid}/resources`);
     expect(iframe.src).toContain('/trace/jkl');
+  });
+
+  it('shows "Select a Jaeger datasource" hint when no datasource is configured', () => {
+    const opts = { ...baseOptions, traceId: 'mno' };
+    render(<JaegerPanel {...baseProps} options={opts} />);
+    expect(screen.getByTestId('jaeger-panel-hint')).toHaveTextContent('Select a Jaeger datasource');
   });
 });

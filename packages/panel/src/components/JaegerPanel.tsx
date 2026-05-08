@@ -5,19 +5,6 @@ import { JaegerPanelOptions } from 'types';
 
 type Props = PanelProps<JaegerPanelOptions>;
 
-function resolveBase(raw: string): string | null {
-  const trimmed = raw.trim().replace(/\/$/, '');
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return null;
-    }
-  } catch {
-    return null;
-  }
-  return trimmed;
-}
-
 function traceEmbedParams(options: JaegerPanelOptions): URLSearchParams {
   const params = new URLSearchParams({ uiEmbed: 'v0' });
   if (options.hideTimelineMinimap) {
@@ -32,15 +19,43 @@ function traceEmbedParams(options: JaegerPanelOptions): URLSearchParams {
   return params;
 }
 
-function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables'], baseOverride?: string): string | null {
-  const base = baseOverride ?? resolveBase(replaceVariables(options.jaegerBaseUrl));
-  if (!base) {
+// Resolve the iframe base URL from the Jaeger datasource instance settings.
+// Returns the CallResource proxy path in proxy mode, or jaegerPublicURL in direct mode.
+// Returns null if the datasource is not configured or the URL is missing/invalid.
+function resolveBaseFromDatasource(uid: string | undefined): string | null {
+  if (!uid) {
     return null;
   }
+  const jsonData = getDataSourceSrv().getInstanceSettings(uid)?.jsonData as any;
+  if (!jsonData) {
+    return null;
+  }
+  if (jsonData.proxyMode) {
+    return `/api/datasources/uid/${uid}/resources`;
+  }
+  const publicUrl = (jsonData.jaegerPublicURL ?? '').trim().replace(/\/$/, '');
+  try {
+    const parsed = new URL(publicUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return publicUrl;
+}
 
+function getBase(data: Props['data'], options: JaegerPanelOptions): string | null {
+  // Prefer the uid from the live query (Explore / datasource-linked panels), fall back to
+  // the uid in panel options (dashboard panels driven by a $traceId variable).
+  const uid = data.request?.targets?.[0]?.datasource?.uid ?? options.datasourceUid;
+  return resolveBaseFromDatasource(uid);
+}
+
+function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables'], base: string): string | null {
   switch (options.mode) {
     case 'trace': {
-      const traceId = replaceVariables(options.traceId).trim();
+      const traceId = replaceVariables(options.traceId ?? '').trim();
       if (!traceId) {
         return null;
       }
@@ -48,8 +63,8 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
     }
 
     case 'diff': {
-      const traceId = replaceVariables(options.traceId).trim();
-      const traceIdB = replaceVariables(options.traceIdB).trim();
+      const traceId = replaceVariables(options.traceId ?? '').trim();
+      const traceIdB = replaceVariables(options.traceIdB ?? '').trim();
       if (!traceId || !traceIdB) {
         return null;
       }
@@ -72,9 +87,9 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
   }
 }
 
-function hint(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables']): string {
-  if (!resolveBase(replaceVariables(options.jaegerBaseUrl))) {
-    return 'Enter a valid Jaeger UI base URL (http:// or https://) in panel options.';
+function hint(base: string | null, options: JaegerPanelOptions): string {
+  if (!base) {
+    return 'Select a Jaeger datasource in panel options.';
   }
   if (options.mode === 'diff') {
     return 'Enter two Trace IDs in panel options.';
@@ -105,51 +120,28 @@ function traceIdFromData(data: Props['data']): string | null {
 // where Grafana allocates only the remaining viewport height after the query builder.
 const MIN_IFRAME_HEIGHT = 600;
 
-// Resolve the iframe base URL from the datasource settings when available (proxy mode),
-// falling back to the panel option jaegerBaseUrl (direct mode).
-// Resolve the iframe base URL synchronously from datasource instance settings.
-// Prefers the uid from the live query (Explore), falls back to the uid set in panel options
-// (dashboard panels driven by a $traceId variable with no active query).
-function useJaegerBase(
-  data: Props['data'],
-  options: JaegerPanelOptions,
-  replaceVariables: Props['replaceVariables']
-): string | null {
-  const uid = data.request?.targets?.[0]?.datasource?.uid ?? options.datasourceUid;
-  if (uid) {
-    const jsonData = getDataSourceSrv().getInstanceSettings(uid)?.jsonData as any;
-    if (jsonData?.proxyMode) {
-      return `/api/datasources/uid/${uid}/resources`;
-    }
-  }
-  return resolveBase(replaceVariables(options.jaegerBaseUrl));
-}
-
 export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, replaceVariables }) => {
   const iframeHeight = Math.max(height, MIN_IFRAME_HEIGHT);
-  const base = useJaegerBase(data, options, replaceVariables);
+  const base = getBase(data, options);
 
   // DataFrame-driven path: when the Jaeger datasource delivers a single-row trace frame
   // (via Explore or a datasource-linked panel), render the iframe from that trace ID.
   const frameTraceId = traceIdFromData(data);
-  if (frameTraceId) {
-    if (base) {
-      const url = `${base}/trace/${encodeURIComponent(frameTraceId)}?${traceEmbedParams(options)}`;
-      return (
-        <iframe
-          src={url}
-          width={width}
-          height={iframeHeight}
-          style={{ border: 'none', display: 'block' }}
-          title="Jaeger Trace"
-          data-testid="jaeger-panel-iframe"
-        />
-      );
-    }
+  if (frameTraceId && base) {
+    return (
+      <iframe
+        src={`${base}/trace/${encodeURIComponent(frameTraceId)}?${traceEmbedParams(options)}`}
+        width={width}
+        height={iframeHeight}
+        style={{ border: 'none', display: 'block' }}
+        title="Jaeger Trace"
+        data-testid="jaeger-panel-iframe"
+      />
+    );
   }
 
   // Panel-options path: dashboard panels with $traceId variable, search mode, diff mode.
-  const url = buildUrl(options, replaceVariables, base ?? undefined);
+  const url = base ? buildUrl(options, replaceVariables, base) : null;
 
   if (!url) {
     return (
@@ -165,7 +157,7 @@ export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, rep
         }}
         data-testid="jaeger-panel-hint"
       >
-        {hint(options, replaceVariables)}
+        {hint(base, options)}
       </div>
     );
   }
