@@ -1,8 +1,15 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { FieldType, LoadingState, toDataFrame } from '@grafana/data';
+import { getDataSourceSrv } from '@grafana/runtime';
 import { JaegerPanel } from './JaegerPanel';
 import { JaegerPanelOptions } from '../types';
+
+jest.mock('@grafana/runtime', () => ({
+  getDataSourceSrv: jest.fn(),
+}));
+
+const mockGetDataSourceSrv = getDataSourceSrv as jest.Mock;
 
 const baseOptions: JaegerPanelOptions = {
   jaegerBaseUrl: 'http://jaeger:16686',
@@ -33,6 +40,12 @@ const baseProps = {
   fieldConfig: { defaults: {}, overrides: [] },
   eventBus: { subscribe: () => ({ unsubscribe: () => {} }) } as any,
 };
+
+beforeEach(() => {
+  mockGetDataSourceSrv.mockReturnValue({
+    get: jest.fn().mockResolvedValue({ instanceSettings: { jsonData: { proxyMode: false } } }),
+  });
+});
 
 describe('JaegerPanel — DataFrame-driven path', () => {
   it('renders iframe from single-row traceID frame, ignoring panel traceId option', () => {
@@ -82,5 +95,61 @@ describe('JaegerPanel — DataFrame-driven path', () => {
     const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
     expect(iframe.src).toContain('uiTimelineHideMinimap=1');
     expect(iframe.src).toContain('uiTimelineCollapseTitle=1');
+  });
+});
+
+describe('JaegerPanel — proxy mode base URL', () => {
+  const dsUid = 'test-uid-123';
+  const dataWithTarget = {
+    series: [],
+    state: LoadingState.Done,
+    timeRange: {} as any,
+    request: { targets: [{ datasource: { uid: dsUid } }] } as any,
+  };
+
+  it('uses proxy base URL when datasource has proxyMode=true', async () => {
+    mockGetDataSourceSrv.mockReturnValue({
+      get: jest.fn().mockResolvedValue({ instanceSettings: { jsonData: { proxyMode: true } } }),
+    });
+
+    const opts = { ...baseOptions, traceId: 'abc' };
+    await act(async () => {
+      render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
+    });
+
+    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
+    expect(iframe.src).toContain(`/api/datasources/uid/${dsUid}/resources`);
+    expect(iframe.src).toContain('/trace/abc');
+  });
+
+  it('falls back to jaegerBaseUrl when datasource has proxyMode=false', async () => {
+    mockGetDataSourceSrv.mockReturnValue({
+      get: jest.fn().mockResolvedValue({ instanceSettings: { jsonData: { proxyMode: false } } }),
+    });
+
+    const opts = { ...baseOptions, traceId: 'def' };
+    await act(async () => {
+      render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
+    });
+
+    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
+    expect(iframe.src).toContain('http://jaeger:16686');
+    expect(iframe.src).toContain('/trace/def');
+    expect(iframe.src).not.toContain('/api/datasources');
+  });
+
+  it('falls back to jaegerBaseUrl when getDataSourceSrv rejects', async () => {
+    mockGetDataSourceSrv.mockReturnValue({
+      get: jest.fn().mockRejectedValue(new Error('not found')),
+    });
+
+    const opts = { ...baseOptions, traceId: 'ghi' };
+    await act(async () => {
+      render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
+    });
+
+    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
+    expect(iframe.src).toContain('http://jaeger:16686');
+    expect(iframe.src).toContain('/trace/ghi');
   });
 });
