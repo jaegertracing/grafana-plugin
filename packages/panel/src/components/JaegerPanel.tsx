@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FieldType, PanelProps } from '@grafana/data';
+import { getDataSourceSrv } from '@grafana/runtime';
 import { JaegerPanelOptions } from 'types';
 
 type Props = PanelProps<JaegerPanelOptions>;
@@ -31,8 +32,8 @@ function traceEmbedParams(options: JaegerPanelOptions): URLSearchParams {
   return params;
 }
 
-function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables']): string | null {
-  const base = resolveBase(replaceVariables(options.jaegerBaseUrl));
+function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables'], baseOverride?: string): string | null {
+  const base = baseOverride ?? resolveBase(replaceVariables(options.jaegerBaseUrl));
   if (!base) {
     return null;
   }
@@ -104,14 +105,48 @@ function traceIdFromData(data: Props['data']): string | null {
 // where Grafana allocates only the remaining viewport height after the query builder.
 const MIN_IFRAME_HEIGHT = 600;
 
+// Resolve the iframe base URL from the datasource settings when available (proxy mode),
+// falling back to the panel option jaegerBaseUrl (direct mode).
+function useJaegerBase(
+  data: Props['data'],
+  options: JaegerPanelOptions,
+  replaceVariables: Props['replaceVariables']
+): string | null {
+  const [proxyBase, setProxyBase] = useState<string | null>(null);
+
+  useEffect(() => {
+    const uid = data.request?.targets?.[0]?.datasource?.uid;
+    if (!uid) {
+      setProxyBase(null);
+      return;
+    }
+    getDataSourceSrv()
+      .get(uid)
+      .then((ds) => {
+        const jsonData = (ds as any).instanceSettings?.jsonData ?? {};
+        if (jsonData.proxyMode) {
+          setProxyBase(`/api/datasources/uid/${uid}/resources`);
+        } else {
+          setProxyBase(null);
+        }
+      })
+      .catch(() => setProxyBase(null));
+  }, [data.request?.targets?.[0]?.datasource?.uid]);
+
+  if (proxyBase !== null) {
+    return proxyBase;
+  }
+  return resolveBase(replaceVariables(options.jaegerBaseUrl));
+}
+
 export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, replaceVariables }) => {
   const iframeHeight = Math.max(height, MIN_IFRAME_HEIGHT);
+  const base = useJaegerBase(data, options, replaceVariables);
+
   // DataFrame-driven path: when the Jaeger datasource delivers a single-row trace frame
-  // (via Explore or a datasource-linked panel), render the iframe directly from that trace ID.
-  // The base URL still comes from panel options — proxy mode (Phase 3) will change this.
+  // (via Explore or a datasource-linked panel), render the iframe from that trace ID.
   const frameTraceId = traceIdFromData(data);
   if (frameTraceId) {
-    const base = resolveBase(replaceVariables(options.jaegerBaseUrl));
     if (base) {
       const url = `${base}/trace/${encodeURIComponent(frameTraceId)}?${traceEmbedParams(options)}`;
       return (
@@ -128,7 +163,7 @@ export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, rep
   }
 
   // Panel-options path: dashboard panels with $traceId variable, search mode, diff mode.
-  const url = buildUrl(options, replaceVariables);
+  const url = buildUrl(options, replaceVariables, base ?? undefined);
 
   if (!url) {
     return (
