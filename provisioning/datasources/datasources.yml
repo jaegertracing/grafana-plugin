@@ -17,4 +17,5 @@ datasources:
     access: proxy
     jsonData:
       proxyMode: true
+      jaegerPublicURL: http://localhost:16686
       jaegerInternalURL: http://jaeger:16686

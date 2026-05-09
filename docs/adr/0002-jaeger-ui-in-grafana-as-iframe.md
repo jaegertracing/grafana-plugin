@@ -7,7 +7,7 @@
 
 ## TL;DR
 
-Implements the iframe rendering approach decided in ADR 0001. A panel plugin renders `<iframe src={jaegerUrl}>` and a datasource plugin provides Explore integration and Jaeger API access. A Go backend binary supports a proxy mode for routing API calls through the Grafana server. The Jaeger SPA itself must always be served from a browser-reachable origin; Grafana's proxy infrastructure cannot serve executable JavaScript due to a universal `Content-Security-Policy: sandbox` header.
+Implements the iframe rendering approach decided in [ADR 0001](./0001-jaeger-ui-in-grafana.md). A panel plugin renders `<iframe src={jaegerUrl}>` and a datasource plugin provides Explore integration and Jaeger API access. A Go backend binary supports a proxy mode for routing API calls through the Grafana server. The Jaeger SPA (single page app) itself must always be served from a browser-reachable origin; Grafana's proxy infrastructure cannot serve executable JavaScript due to a universal `Content-Security-Policy: sandbox` header.
 
 ---
 
@@ -15,7 +15,7 @@ Implements the iframe rendering approach decided in ADR 0001. A panel plugin ren
 
 The plugin lives in its own dedicated repository (`github.com/jaegertracing/grafana-plugin`). This keeps the plugin versioning, releases, CI, and Grafana plugin catalog submission independent of the Jaeger core release cycle. It also avoids introducing Node.js/webpack toolchain into the main Jaeger Go repo, and sidesteps CNCF license compliance concerns around Grafana's AGPLv3 dependencies (`@grafana/ui`, `@grafana/data`, `@grafana/runtime`) which are not approved for inclusion in Apache-2.0 CNCF projects.
 
-The Go backend binary (Phase 3), if it needs to import Jaeger internals, will do so as a regular Go module dependency (`github.com/jaegertracing/jaeger`).
+The Go backend binary (Phase 3) does not import any Jaeger internals — it communicates with Jaeger exclusively over HTTP. The Jaeger backend repo explicitly disallows external dependencies on its internal packages, and none are needed here.
 
 **Jaeger UI changes** (`uiEmbed` flag additions in Phase 4, `uiLinkPatterns` in Phase 5) are PRs to the jaeger-ui repo, released independently and consumed here via npm.
 
@@ -70,7 +70,7 @@ The phases are ordered to reduce project risk as early as possible. The first tw
 
 ---
 
-### Phase 0 — Proof of concept (half a day)
+### Phase 0 — Proof of concept
 
 **Goal:** Validate the core hypothesis: a Jaeger trace renders correctly inside a Grafana panel iframe, and `uiEmbed=v0` produces an acceptable embedded UX. If this does not work, the entire approach is invalidated before any real investment.
 
@@ -147,10 +147,10 @@ The phases are ordered to reduce project risk as early as possible. The first tw
 - Service discovery and trace search flow through the Grafana backend proxy; no browser-to-Jaeger API traffic.
 - Search results table shows `traceName`, `spanCount`, `duration`, with two context-menu links per row: "Open in dashboard" (sets `$traceId` variable, stays on page) and "Open in Explore" (`splitOpen()`, second pane renders trace iframe).
 - `preferredVisualisationPluginId` routes trace-ID lookup results to the Jaeger panel automatically in Explore.
-- Iframe base URL falls back to `http://localhost:16686` (panel default) in Explore's second pane, which works for local dev. Production deployments require Phase 3.
+- Iframe base URL is read from the datasource's `jaegerPublicURL` field; if unset, the panel shows a "Select a Jaeger datasource" hint. Production deployments must configure `jaegerPublicURL` in the datasource settings.
 
 **Constraints carried forward to Phase 3:**
-- Iframe base URL must still be configured manually in panel options (`jaegerBaseUrl`). The Grafana backend proxy path is not usable for iframe navigation; Phase 3's Go binary resolves this by serving the Jaeger UI from the Grafana origin.
+- Iframe base URL (`jaegerPublicURL`) must be configured in the datasource settings. Phase 3 consolidates this as the single source of truth and removes the panel-level URL field.
 - `splitOpen()` in Explore opens a cramped half-width second pane (same behaviour as the built-in Jaeger datasource). The two-panel dashboard pattern is the recommended UX for trace viewing.
 
 **Exit criterion met:** Grafana Explore with the Jaeger datasource shows a search results table with trace IDs. Clicking a trace ID either opens it inline on the dashboard or in a second Explore pane. CI passes.
@@ -201,21 +201,49 @@ What this means in practice:
 - **API proxy works**: datasource TypeScript routes `/api/traces`, `/api/services` etc. through `CallResource` — JSON responses, no script execution, sandbox does not affect them.
 - **SPA proxy does not work**: the iframe `src` cannot be set to any Grafana proxy path.
 
-**Path forward for full SSO iframe proxy: external sidecar**
+**Path forward for SSO deployments: same-origin reverse proxy**
 
-In SSO deployments where Jaeger is not browser-accessible, the iframe will fail regardless of proxy mode. The only solution is a proxy that lives outside Grafana's request pipeline:
+The SSO iframe problem is not about reachability — it is about **cross-origin cookies**. The typical enterprise scenario:
 
-1. **SSO gateway in front of Jaeger** (e.g. oauth2-proxy): a browser-accessible reverse proxy that authenticates the user and forwards requests to the internal Jaeger. The panel iframes directly to this gateway's URL via `jaegerPublicURL`. No plugin changes needed — operators configure `jaegerPublicURL` to point at the gateway. This is the lowest-effort path for deployments with an existing SSO infrastructure.
+- Jaeger is browser-accessible at `https://jaeger.mydomain.com`, protected by corporate SSO.
+- Grafana is at `https://grafana.mydomain.com`, protected by the same SSO.
+- The user is already authenticated in Grafana. But the panel's `<iframe src="https://jaeger.mydomain.com/...">` is a cross-origin request from the Grafana page.
+- Modern browsers block third-party cookies in iframes. The Jaeger SSO session cookie (scoped to `jaeger.mydomain.com`) is not sent with the iframe navigation from `grafana.mydomain.com`.
+- The SSO provider redirects inside the iframe to its login page, which itself typically blocks iframe rendering (clickjacking protection). Result: broken iframe.
 
-2. **Dedicated sidecar proxy**: a small HTTP reverse proxy deployed alongside Grafana, accessible from the browser at a distinct port or hostname, forwarding to the internal Jaeger URL and handling SSO token validation. The datasource would gain a `jaegerProxyURL` field pointing at this sidecar.
+The root cause is the cross-origin iframe. The fix is to serve Jaeger from the **same origin as Grafana**, eliminating the cross-origin request entirely.
 
-Both options are deployment-side solutions. The plugin's role is to expose a configurable `jaegerPublicURL` that operators point at whichever browser-accessible Jaeger endpoint they have.
+**Recommended approach: ingress path prefix**
+
+Configure the upstream reverse proxy (nginx, Envoy, AWS ALB, Kubernetes ingress) to route `https://grafana.mydomain.com/jaeger/` to the internal Jaeger service. Set `jaegerPublicURL` in the datasource to `https://grafana.mydomain.com/jaeger`. The iframe `src` becomes `https://grafana.mydomain.com/jaeger/trace/...` — same origin as Grafana, no SSO redirect, no third-party cookie issue.
+
+```
+Browser ──HTTPS──▶ Ingress (grafana.mydomain.com)
+                       │
+           ┌───────────┴─────────────┐
+           │ /grafana/ → Grafana     │ /jaeger/ → Jaeger (internal)
+           └─────────────────────────┘
+```
+
+Jaeger's `--query.base-path=/jaeger` flag must match the path prefix so its HTML, asset references, and API calls all resolve correctly under `/jaeger/`.
+
+- **No plugin changes needed.** Set `jaegerPublicURL: https://grafana.mydomain.com/jaeger`.
+- SSO is handled by the ingress for all `grafana.mydomain.com` traffic.
+- If `--query.bearer-token-propagation` is enabled, the ingress can forward the user's JWT from the Grafana session to Jaeger for per-user storage access control.
+
+**Limitations of this approach:**
+- Requires ingress-level configuration by ops; not self-contained in the plugin.
+- Jaeger's `--query.base-path` must match. If it is not configurable in a given deployment, the SPA's asset URLs will break.
+- No fallback for deployments where the ingress cannot be reconfigured.
+
+**Current plugin role**: `jaegerPublicURL` is the single configuration point for the iframe base. It is intentionally generic — operators point it at whatever browser-accessible Jaeger origin they have, whether that is a direct URL, an ingress path prefix, or any other arrangement. The plugin does not prescribe the deployment topology.
 
 **Constraints carried forward:**
 - `jaegerInternalURL` is stored in `jsonData` (browser-visible). For hardened deployments this should move to `secureJsonData`. Tracked as future improvement.
 - CI does not yet build the Go binary on every PR (tracked for a follow-up CI update).
+- Bearer token propagation to Jaeger storage is architecturally in place but not tested end-to-end.
 
-**Exit criterion met (revised):** Proxy mode works for datasource API calls. The panel iframe always loads from `jaegerPublicURL`.
+**Exit criterion met:** Proxy mode works for datasource API calls (search, service discovery, health check). The panel iframe loads from `jaegerPublicURL` in all modes. Both the direct-mode and proxy-mode provisioned dashboards are functional.
 
 ---
 
@@ -265,8 +293,8 @@ Both options are deployment-side solutions. The plugin's role is to expose a con
 | `jaegerPublicURL` as single source of truth  |      |      |      | ✅    |      |      |
 | `DataSourcePicker` in panel options          |      |      |      | ✅    |      |      |
 | Bearer token forwarding (code; untested)     |      |      |      | ⚠️    |      |      |
-| `jaegerInternalURL` in `secureJsonData`      |      |      |      |       | ✅    |      |
-| Grafana plugin catalog submission + signing  |      |      |      |       |      | ✅    |
+| `jaegerInternalURL` in `secureJsonData`      |      |      |      |       | ⬜    |      |
+| Grafana plugin catalog submission + signing  |      |      |      |       |      | ⬜    |
 | `uiEmbed` flag additions (jaeger-ui)         |      |      |      |      | ✅    |      |
 | `uiLinkPatterns` URL param (jaeger-ui)       |      |      |      |      |      | ✅    |
 
