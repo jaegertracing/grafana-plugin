@@ -1,0 +1,81 @@
+services:
+  # Option 1: Jaeger with --query.base-path set, transparent proxy (no prefix stripping).
+  # httpd1 passes /jaeger/ui/* through to jaeger1:16686/jaeger/ui/* unchanged.
+  jaeger1:
+    image: jaegertracing/jaeger:2.17.0
+    command: "--set extensions.jaeger_query.base_path=/jaeger/ui"
+    networks:
+      - proxy-net
+
+  hotrod1:
+    image: jaegertracing/example-hotrod:2.17.0
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger1:4318
+    networks:
+      - proxy-net
+    depends_on:
+      - jaeger1
+
+  httpd1:
+    image: httpd:latest
+    ports:
+      - "18080:80"
+    volumes:
+      - ./httpd-option1.conf:/usr/local/apache2/conf/httpd.conf
+    networks:
+      - proxy-net
+    depends_on:
+      - jaeger1
+
+  # Option 2: Jaeger without base_path, proxy strips /jaeger/ui prefix and
+  # rewrites <base href> in HTML responses. Allows Jaeger to serve at both
+  # its own root and under the /jaeger/ui prefix simultaneously.
+  jaeger2:
+    image: jaegertracing/jaeger:2.17.0
+    networks:
+      - proxy-net
+
+  hotrod2:
+    image: jaegertracing/example-hotrod:2.17.0
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger2:4318
+    networks:
+      - proxy-net
+    depends_on:
+      - jaeger2
+
+  httpd2:
+    image: httpd:latest
+    ports:
+      - "18081:80"
+    volumes:
+      - ./httpd-option2.conf:/usr/local/apache2/conf/httpd.conf
+    networks:
+      - proxy-net
+    depends_on:
+      - jaeger2
+
+  # Grafana instance with both datasources configured, used for integration tests.
+  grafana:
+    user: root
+    image: grafana/grafana:12.4.0
+    ports:
+      - "18082:3000"
+    volumes:
+      - ../../packages/panel/dist:/var/lib/grafana/plugins/jaegertracing-jaeger-panel
+      - ../../packages/datasource/dist:/var/lib/grafana/plugins/jaegertracing-jaeger-datasource
+      - ./provisioning:/etc/grafana/provisioning
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_DEFAULT_APP_MODE: development
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: "jaegertracing-jaeger-panel,jaegertracing-jaeger-datasource"
+    networks:
+      - proxy-net
+    depends_on:
+      - httpd1
+      - httpd2
+
+networks:
+  proxy-net:
