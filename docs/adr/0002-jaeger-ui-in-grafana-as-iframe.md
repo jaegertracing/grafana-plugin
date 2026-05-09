@@ -52,15 +52,33 @@ grafana-plugin/
 
 ---
 
-## Backend Binary: When It Is Needed
+## Backend Binary: Purpose and Necessity
 
-Grafana plugins can be frontend-only (`"backend": false`) or full-stack (`"backend": true`, Go binary required). The binary is only needed for server-side logic. For the iframe approach:
+Grafana plugins can be frontend-only (`"backend": false`) or full-stack (`"backend": true`, Go binary required). The panel plugin is always frontend-only. For the datasource plugin, the question is more nuanced.
 
-- The **panel plugin** is always frontend-only — it renders `<iframe>`.
-- The **datasource plugin** is frontend-only in direct mode (no HTTP calls to Jaeger from the plugin itself; the iframe makes its own calls from the browser).
-- A **Go backend binary** is required only in proxy mode, where the Grafana server must proxy Jaeger API calls server-side. The iframe itself always loads from a browser-reachable origin (see Proxy Mode section below).
+### API call proxying — already handled without the Go binary
 
-The plugin is designed to support both modes via a configuration toggle. The Go binary is present in the final artifact but is only activated when proxy mode is selected — direct mode users do not need it.
+The datasource `plugin.json` defines a built-in DataProxy route:
+
+```json
+"routes": [{"path": "api", "url": "{{ .URL }}/api"}]
+```
+
+This instructs Grafana's **built-in DataProxy** to forward requests from the browser at `/api/datasources/proxy/uid/<uid>/api/*` → `<datasource url>/api/*` entirely server-side, without any Go binary. The TypeScript datasource uses `instanceSettings.url` which resolves to this DataProxy path — so browser-to-Jaeger API traffic never happens in direct mode either. The DataProxy also supports `jsonData.oauthPassThru` for forwarding OAuth tokens to the upstream.
+
+In proxy mode the Go binary routes the same API calls through `CallResource`. This is **redundant** with what the DataProxy already does: if the proxied datasource's `url` field is set to the internal Jaeger address, the DataProxy route handles `/api/traces`, `/api/services`, etc. identically.
+
+### What the Go binary uniquely provides
+
+1. **Meaningful health check**: A frontend-only datasource cannot implement `CheckHealth` — Grafana shows a generic "OK" regardless. The Go binary implements `CheckHealth` by calling `/api/services` on the internal Jaeger URL and reporting a concrete success or error message. This is the primary remaining justification for the binary.
+
+2. **Bearer token forwarding to Jaeger storage**: The Go binary explicitly propagates the `Authorization` header from the Grafana request to Jaeger, enabling `--query.bearer-token-propagation`. The DataProxy's `oauthPassThru` forwards the Grafana user's *own* OAuth token, which may or may not be the same credential Jaeger's storage backend expects. For deployments that require per-user storage access control this distinction may matter — but it is not yet validated (see Phase 3 constraints).
+
+3. **Future server-side logic**: if the plugin ever needs to do server-side query transformation, caching, or streaming, the binary provides the entry point.
+
+### Conclusion
+
+The Go binary is not needed for basic API proxying, which the DataProxy `routes` already handles. It is justified primarily by the health check UX and potentially by bearer token forwarding for SSO deployments. If those use cases are not a priority, the datasource could be simplified to frontend-only by removing `"backend": true` and relying solely on the DataProxy route. This is a trade-off to revisit before the plugin catalog submission.
 
 ---
 
