@@ -70,15 +70,15 @@ In proxy mode the Go binary routes the same API calls through `CallResource`. Th
 
 ### What the Go binary uniquely provides
 
-1. **Meaningful health check**: A frontend-only datasource cannot implement `CheckHealth` — Grafana shows a generic "OK" regardless. The Go binary implements `CheckHealth` by calling `/api/services` on the internal Jaeger URL and reporting a concrete success or error message. This is the primary remaining justification for the binary.
+1. **Grafana's background health polling**: Grafana periodically calls `CheckHealth` on all datasources to maintain the green/red health indicator in the datasource list. A frontend-only datasource always shows green regardless of whether Jaeger is reachable. The Go binary can call `/api/services` on the internal Jaeger URL and return a meaningful error.
 
-2. **Bearer token forwarding to Jaeger storage**: The Go binary explicitly propagates the `Authorization` header from the Grafana request to Jaeger, enabling `--query.bearer-token-propagation`. The DataProxy's `oauthPassThru` forwards the Grafana user's *own* OAuth token, which may or may not be the same credential Jaeger's storage backend expects. For deployments that require per-user storage access control this distinction may matter — but it is not yet validated (see Phase 3 constraints).
+   However, the user-facing **"Test" button** in the datasource config editor calls the TypeScript `testDatasource()` method, not `CheckHealth`. Our TypeScript datasource already implements `testDatasource()` by calling `/api/services` and reporting success or failure — so the health check that actually matters to operators is already covered without the binary. The Go `CheckHealth` only adds Grafana's background polling dot, which is a minor UX nicety.
 
-3. **Future server-side logic**: if the plugin ever needs to do server-side query transformation, caching, or streaming, the binary provides the entry point.
+2. **Future server-side logic**: if the plugin ever needs server-side query transformation, caching, or streaming, the binary provides the entry point.
 
 ### Conclusion
 
-The Go binary is not needed for basic API proxying, which the DataProxy `routes` already handles. It is justified primarily by the health check UX and potentially by bearer token forwarding for SSO deployments. If those use cases are not a priority, the datasource could be simplified to frontend-only by removing `"backend": true` and relying solely on the DataProxy route. This is a trade-off to revisit before the plugin catalog submission.
+The Go binary's API proxying is redundant with the DataProxy `routes` already in `plugin.json`. Its remaining value — the background health polling dot — is marginal, since the operator-visible "Test" button is handled entirely by TypeScript. The datasource is a candidate for simplification to frontend-only (`"backend": false`) before catalog submission, which would eliminate the build complexity and the unsigned-binary allowlist requirement.
 
 ---
 
@@ -183,7 +183,7 @@ The phases are ordered to reduce project risk as early as possible. The first tw
 
 When Grafana and Jaeger are deployed in the same private network (not individually SSO-protected), all browser-to-Jaeger requests are blocked because Jaeger has no public address. The Go binary solves the API-call side of this: `/api/traces`, `/api/services`, `/api/operations` are forwarded server-side, so the search results table and health check work. The iframe still requires a browser-reachable Jaeger origin for the SPA (see Proxy Mode Limitations below).
 
-Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, Jaeger forwards the incoming `Authorization` header to the trace storage backend for per-user access control. The Go binary extracts the user's bearer token from the incoming Grafana request and injects it into all outgoing Jaeger requests.
+Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, Jaeger forwards the incoming `Authorization` header to the trace storage backend for per-user access control. The Go binary propagates the `Authorization` header from the Grafana request to Jaeger for this purpose. Note: this only covers the datasource API calls (search, services, operations); the iframe always loads from `jaegerPublicURL` directly in the browser and is outside the Go binary's scope entirely.
 
 **What was built:**
 
@@ -200,8 +200,8 @@ Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, 
 **Validated (2026-05-08):**
 - Health check: "Connected to Jaeger at http://jaeger:16686" when proxy mode is enabled with a reachable Jaeger.
 - Search results table populates via `/api/datasources/uid/jaeger-proxied/resources/api/traces?...` (visible in DevTools Network tab).
-- Two-panel dashboard works identically with the proxied datasource for API calls.
-- Bearer token forwarding: code is in place (`Authorization` header is propagated) but **not tested** end-to-end — requires a Jaeger deployment with `--query.bearer-token-propagation` enabled and a real SSO-issued token. This remains an open validation item.
+- Search panel populates correctly through the proxy. The trace detail panel also renders because `jaegerPublicURL` points to a locally accessible Jaeger — not because of proxy mode. In a deployment where Jaeger is internal-only, the trace panel iframe would still fail.
+- Bearer token forwarding: code is in place (`Authorization` header is propagated to Jaeger API calls) but **not tested** end-to-end. Scope is limited to datasource API calls only; the iframe is unaffected.
 
 **Proxy Mode Limitations: CSP Sandbox**
 
@@ -319,7 +319,6 @@ A key question is whether Jaeger can be proxied under a path prefix without sett
 | API proxy via CallResource                   |      |      |      | ✅    |      |      |
 | `jaegerPublicURL` as single source of truth  |      |      |      | ✅    |      |      |
 | `DataSourcePicker` in panel options          |      |      |      | ✅    |      |      |
-| Bearer token forwarding (code; untested)     |      |      |      | ⚠️    |      |      |
 | `jaegerInternalURL` in `secureJsonData`      |      |      |      |       | ⬜    |      |
 | Grafana plugin catalog submission + signing  |      |      |      |       |      | ⬜    |
 | `uiEmbed` flag additions (jaeger-ui)         |      |      |      |      | ✅    |      |
