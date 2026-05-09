@@ -100,17 +100,18 @@ describe('JaegerPanel — base URL from datasource', () => {
     request: { targets: [{ datasource: { uid: dsUid } }] } as any,
   };
 
-  it('uses proxy base URL when datasource has proxyMode=true', () => {
+  it('uses jaegerPublicURL when datasource has proxyMode=true', () => {
     mockGetDataSourceSrv.mockReturnValue({
-      getInstanceSettings: jest.fn().mockReturnValue({ jsonData: { proxyMode: true } }),
+      getInstanceSettings: jest.fn().mockReturnValue({ jsonData: { proxyMode: true, jaegerPublicURL: 'http://proxy:18080/jaeger/ui' } }),
     });
 
     const opts = { ...baseOptions, traceId: 'abc' };
     render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
 
     const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
-    expect(iframe.src).toContain(`/api/datasources/uid/${dsUid}/resources`);
+    expect(iframe.src).toContain('http://proxy:18080/jaeger/ui');
     expect(iframe.src).toContain('/trace/abc');
+    expect(iframe.src).not.toContain('/api/datasources');
   });
 
   it('uses jaegerPublicURL when datasource has proxyMode=false', () => {
@@ -138,17 +139,18 @@ describe('JaegerPanel — base URL from datasource', () => {
     expect(screen.getByTestId('jaeger-panel-hint')).toBeInTheDocument();
   });
 
-  it('uses proxy base URL when uid comes from panel options (no data.request)', () => {
+  it('uses jaegerPublicURL when uid comes from panel options (no data.request)', () => {
     mockGetDataSourceSrv.mockReturnValue({
-      getInstanceSettings: jest.fn().mockReturnValue({ jsonData: { proxyMode: true } }),
+      getInstanceSettings: jest.fn().mockReturnValue({ jsonData: { proxyMode: true, jaegerPublicURL: 'http://proxy:18080/jaeger/ui' } }),
     });
 
     const opts = { ...baseOptions, traceId: 'jkl', datasourceUid: dsUid };
     render(<JaegerPanel {...baseProps} options={opts} />);
 
     const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
-    expect(iframe.src).toContain(`/api/datasources/uid/${dsUid}/resources`);
+    expect(iframe.src).toContain('http://proxy:18080/jaeger/ui');
     expect(iframe.src).toContain('/trace/jkl');
+    expect(iframe.src).not.toContain('/api/datasources');
   });
 
   it('shows "Select a Jaeger datasource" hint when no datasource is configured', () => {
