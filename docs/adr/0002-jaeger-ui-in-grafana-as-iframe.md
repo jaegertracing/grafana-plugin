@@ -220,20 +220,29 @@ Configure the upstream reverse proxy (nginx, Envoy, AWS ALB, Kubernetes ingress)
 ```
 Browser ──HTTPS──▶ Ingress (grafana.mydomain.com)
                        │
-           ┌───────────┴─────────────┐
-           │ /grafana/ → Grafana     │ /jaeger/ → Jaeger (internal)
-           └─────────────────────────┘
+           ┌───────────┴──────────────────────────────────┐
+           │ /         → Grafana                          │
+           │ /jaeger/* → Jaeger (internal)                │
+           └──────────────────────────────────────────────┘
 ```
-
-Jaeger's `--query.base-path=/jaeger` flag must match the path prefix so its HTML, asset references, and API calls all resolve correctly under `/jaeger/`.
 
 - **No plugin changes needed.** Set `jaegerPublicURL: https://grafana.mydomain.com/jaeger`.
 - SSO is handled by the ingress for all `grafana.mydomain.com` traffic.
-- If `--query.bearer-token-propagation` is enabled, the ingress can forward the user's JWT from the Grafana session to Jaeger for per-user storage access control.
+- If `--query.bearer-token-propagation` is enabled, the ingress can forward the user's JWT for per-user storage access control.
+
+**Open investigation: prefix stripping and base href rewriting**
+
+A key question is whether Jaeger can be proxied under a path prefix without setting `--query.base-path`. Two approaches exist:
+
+1. **Pass `--query.base-path=/jaeger`** to Jaeger: Jaeger natively serves all HTML, assets, and API calls under `/jaeger/`. Simple and correct — but changes Jaeger's own configuration, meaning direct access at `jaeger.mydomain.com/` would also require the prefix, breaking the standalone UI.
+
+2. **Strip the prefix at the ingress + rewrite `<base href>`**: The ingress strips `/jaeger` before forwarding to Jaeger (which sees `/` as normal), and rewrites the `<base href="/" data-inject-target="BASE_URL" />` marker in HTML responses to `<base href="/jaeger/" ...>`. This would allow the same Jaeger instance to be served at both `jaeger.mydomain.com/` and `grafana.mydomain.com/jaeger/` simultaneously.
+
+   Whether option 2 fully works depends on whether Jaeger's SPA makes all API calls and asset fetches through the `<base href>` (relative URLs) or has any hardcoded absolute paths. **This needs to be verified experimentally** — it is tracked as an investigation milestone before this approach is documented as supported.
 
 **Limitations of this approach:**
 - Requires ingress-level configuration by ops; not self-contained in the plugin.
-- Jaeger's `--query.base-path` must match. If it is not configurable in a given deployment, the SPA's asset URLs will break.
+- The ingress must support response body rewriting for option 2 (`sub_filter` in nginx, Lua filter in Envoy). AWS ALB and simpler ingresses do not support this natively.
 - No fallback for deployments where the ingress cannot be reconfigured.
 
 **Current plugin role**: `jaegerPublicURL` is the single configuration point for the iframe base. It is intentionally generic — operators point it at whatever browser-accessible Jaeger origin they have, whether that is a direct URL, an ingress path prefix, or any other arrangement. The plugin does not prescribe the deployment topology.
