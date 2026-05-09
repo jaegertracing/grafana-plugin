@@ -1,4 +1,4 @@
-import { FieldType, LoadingState } from '@grafana/data';
+import { FieldType } from '@grafana/data';
 import { getBackendSrv, getTemplateSrv } from '@grafana/runtime';
 import { of } from 'rxjs';
 import { JaegerDataSource } from './datasource';
