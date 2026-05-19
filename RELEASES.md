@@ -24,8 +24,3 @@ To install on a self-hosted Grafana, unzip into the plugins directory and add to
 allow_loading_unsigned_plugins = jaegertracing-jaeger-panel,jaegertracing-jaeger-datasource
 ```
 
-## Signing (optional)
-
-Signed plugins load without the `allow_loading_unsigned_plugins` override. To enable signing,
-store a Grafana Access Policy Token (with `plugins:write` scope) as the `GRAFANA_ACCESS_POLICY_TOKEN`
-repository secret and add it to the `release.yml` workflow as `policy_token`.
