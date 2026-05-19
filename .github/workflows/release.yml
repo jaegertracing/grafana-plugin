@@ -27,50 +27,27 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
-      - name: Set version in package.json
-        run: |
-          npm pkg set version="${{ steps.version.outputs.version }}" \
-            --workspace packages/panel \
-            --workspace packages/datasource
-
-      - name: Build panel plugin
-        run: npm run build --workspace=packages/panel
-
-      - name: Build datasource plugin
-        run: npm run build --workspace=packages/datasource
-
-      - name: Package plugins
-        id: package
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          PANEL_ZIP="jaegertracing-jaeger-panel-${VERSION}.zip"
-          DS_ZIP="jaegertracing-jaeger-datasource-${VERSION}.zip"
-
-          (cd packages/panel && mv dist jaegertracing-jaeger-panel && zip -r "../../${PANEL_ZIP}" jaegertracing-jaeger-panel)
-          (cd packages/datasource && mv dist jaegertracing-jaeger-datasource && zip -r "../../${DS_ZIP}" jaegertracing-jaeger-datasource)
-
-          sha256sum "${PANEL_ZIP}" "${DS_ZIP}" > checksums.txt
-
-          echo "panel-zip=${PANEL_ZIP}" >> "$GITHUB_OUTPUT"
-          echo "ds-zip=${DS_ZIP}" >> "$GITHUB_OUTPUT"
+      - name: Build and package plugins
+        run: make build-release VERSION="${{ steps.version.outputs.version }}"
 
       - name: Validate panel plugin
         run: |
           docker run --rm \
-            -v "$PWD/${{ steps.package.outputs.panel-zip }}:/archive.zip" \
+            -v "$PWD/dist/jaegertracing-jaeger-panel-${{ steps.version.outputs.version }}.zip:/archive.zip" \
             grafana/plugin-validator-cli -analyzer=metadatavalid /archive.zip
 
       - name: Validate datasource plugin
         run: |
           docker run --rm \
-            -v "$PWD/${{ steps.package.outputs.ds-zip }}:/archive.zip" \
+            -v "$PWD/dist/jaegertracing-jaeger-datasource-${{ steps.version.outputs.version }}.zip:/archive.zip" \
             grafana/plugin-validator-cli -analyzer=metadatavalid /archive.zip
 
       - name: Upload release assets
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           gh release upload "${{ github.ref_name }}" \
-            "${{ steps.package.outputs.panel-zip }}" \
-            "${{ steps.package.outputs.ds-zip }}" \
-            checksums.txt --clobber
+            "dist/jaegertracing-jaeger-panel-${VERSION}.zip" \
+            "dist/jaegertracing-jaeger-datasource-${VERSION}.zip" \
+            dist/checksums.txt --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
