@@ -133,7 +133,7 @@ echo "Waiting 5s for HotROD to generate traces..."
 sleep 5
 
 echo ""
-echo "--- Proxy layer: Option 1 (transparent proxy + --query.base-path) ---"
+echo "--- Proxy layer: Option 1 (transparent proxy + base_path configured) ---"
 
 assert_http_200      "Option1 index.html"          "$OPTION1_URL/"
 # Since Jaeger 2.18.0 the UI auto-detects the base path via inline script (ADR-009).

@@ -262,7 +262,7 @@ Browser ──HTTPS──▶ Ingress (grafana.mydomain.com)
 
 Two approaches exist for the ingress:
 
-1. **`--query.base-path` + transparent proxy**: set `extensions.jaeger_query.base_path=/jaeger` on the Jaeger server. The ingress routes `grafana.mydomain.com/jaeger/*` → `jaeger-internal:16686/jaeger/*` with no path transformation. Jaeger handles the prefix natively. Simple, no response-body rewriting needed. Downside: Jaeger's own standalone URL (`jaeger.mydomain.com/`) also needs the prefix, or a second Jaeger instance without `base_path` must be run.
+1. **`base_path` + transparent proxy**: set `extensions.jaeger_query.base_path=/jaeger` in the Jaeger config. The ingress routes `grafana.mydomain.com/jaeger/*` → `jaeger-internal:16686/jaeger/*` with no path transformation. Jaeger handles the prefix natively. Simple, no response-body rewriting needed. Downside: Jaeger's own standalone URL (`jaeger.mydomain.com/`) also needs the prefix, or a second Jaeger instance without `base_path` must be run.
 
 2. **Prefix stripping only** (since Jaeger 2.18.0): the ingress strips `/jaeger` before forwarding (Jaeger sees `/`). Since Jaeger 2.18.0 the UI auto-detects its base path from `window.location` via an inline script ([ADR-009](https://github.com/jaegertracing/jaeger/blob/main/docs/adr/009-ui-base-path-auto-detection.md)) — no response-body rewriting of `<base href>` is needed. Allows one Jaeger instance to serve at both its own domain and under Grafana's origin prefix simultaneously.
 
@@ -284,7 +284,7 @@ Both options are validated end-to-end in `examples/reverse-proxy/` — see Phase
 
 **Goal:** Validate programmatically that the Grafana plugin works when Jaeger is served behind a reverse proxy under a path prefix. Two proxy approaches are tested:
 
-- **Option 1** (transparent proxy + `--query.base-path`): Jaeger configured with `base_path`, proxy passes paths through unchanged.
+- **Option 1** (transparent proxy + `base_path`): Jaeger configured with `extensions.jaeger_query.base_path`, proxy passes paths through unchanged.
 - **Option 2** (prefix stripping only): proxy strips the prefix; Jaeger's inline base-path detection script (since 2.18.0) handles the rest without any response-body rewriting.
 
 **Implementation:** `examples/reverse-proxy/` in this repo — a self-contained docker-compose stack and a shell test script that runs without a browser.

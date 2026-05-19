@@ -1,5 +1,5 @@
 services:
-  # Option 1: Jaeger with --query.base-path set, transparent proxy (no prefix stripping).
+  # Option 1: Jaeger with base_path set, transparent proxy (no prefix stripping).
   # httpd1 passes /jaeger/ui/* through to jaeger1:16686/jaeger/ui/* unchanged.
   jaeger1:
     image: jaegertracing/jaeger:2.18.0
