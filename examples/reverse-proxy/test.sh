@@ -165,26 +165,27 @@ sleep 5
 echo ""
 echo "--- Proxy layer: Option 1 (transparent proxy + --query.base-path) ---"
 
-assert_http_200     "Option1 index.html"       "$OPTION1_URL/"
-assert_body_contains "Option1 base href marker" "$OPTION1_URL/" \
+assert_http_200      "Option1 index.html"          "$OPTION1_URL/"
+# Since Jaeger 2.18.0 the UI auto-detects the base path via inline script (ADR-009).
+# The backend no longer writes a static <base href="/prefix/"> — assert the marker.
+assert_body_contains "Option1 inline script marker" "$OPTION1_URL/" \
     "data-inject-target=\"BASE_URL\""
-assert_body_contains "Option1 base href value"  "$OPTION1_URL/" \
-    "href=\"$PREFIX"
-assert_http_200     "Option1 /api/services"    "$OPTION1_URL/api/services"
-assert_json_field   "Option1 services non-empty" "$OPTION1_URL/api/services" \
+assert_http_200      "Option1 /api/services"       "$OPTION1_URL/api/services"
+assert_json_field    "Option1 services non-empty"  "$OPTION1_URL/api/services" \
     '.data | length'
-assert_assets_load  "Option1 assets"            "$OPTION1_URL"
+assert_assets_load   "Option1 assets"              "$OPTION1_URL"
 
 echo ""
-echo "--- Proxy layer: Option 2 (prefix stripping + <base href> rewriting) ---"
+echo "--- Proxy layer: Option 2 (prefix stripping, auto base-path detection) ---"
 
-assert_http_200      "Option2 index.html"        "$OPTION2_URL/"
-assert_body_contains "Option2 base href rewritten" "$OPTION2_URL/" \
-    "href=\"$PREFIX"
-assert_http_200      "Option2 /api/services"     "$OPTION2_URL/api/services"
-assert_json_field    "Option2 services non-empty" "$OPTION2_URL/api/services" \
+assert_http_200      "Option2 index.html"           "$OPTION2_URL/"
+# No Substitute rewriting needed since 2.18.0 — just check the script marker is present.
+assert_body_contains "Option2 inline script marker" "$OPTION2_URL/" \
+    "data-inject-target=\"BASE_URL\""
+assert_http_200      "Option2 /api/services"        "$OPTION2_URL/api/services"
+assert_json_field    "Option2 services non-empty"   "$OPTION2_URL/api/services" \
     '.data | length'
-assert_assets_load   "Option2 assets"             "$OPTION2_URL"
+assert_assets_load   "Option2 assets"               "$OPTION2_URL"
 
 echo ""
 echo "--- Grafana integration: Option 1 datasource ---"

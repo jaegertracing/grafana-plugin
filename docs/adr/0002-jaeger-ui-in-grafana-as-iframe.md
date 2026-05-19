@@ -261,21 +261,20 @@ Browser ──HTTPS──▶ Ingress (grafana.mydomain.com)
 - SSO is handled by the ingress for all `grafana.mydomain.com` traffic.
 - If `--query.bearer-token-propagation` is enabled, the ingress can forward the user's JWT for per-user storage access control.
 
-**Proxy approaches: two options, one validated by Jaeger upstream**
-
-Jaeger already documents and tests a reverse-proxy pattern in `examples/reverse-proxy/` (jaeger repo). That example uses Apache httpd with `--set extensions.jaeger_query.base_path=/jaeger/prefix`: Jaeger serves all HTML, assets, and API calls under the prefix natively, and the proxy passes the path through unchanged (no stripping, no response rewriting needed).
+**Proxy approaches: two options, both validated**
 
 Two approaches exist for the ingress:
 
-1. **`--query.base-path` + transparent proxy** (validated upstream): set `--set extensions.jaeger_query.base_path=/jaeger` on the Jaeger server. The ingress routes `grafana.mydomain.com/jaeger/*` → `jaeger-internal:16686/jaeger/*` with no path transformation. Jaeger handles the prefix natively. Simple, no response-body rewriting needed. Downside: Jaeger's own standalone URL (`jaeger.mydomain.com/`) would also need the prefix, or a second Jaeger instance without `base_path` must be run.
+1. **`--query.base-path` + transparent proxy**: set `extensions.jaeger_query.base_path=/jaeger` on the Jaeger server. The ingress routes `grafana.mydomain.com/jaeger/*` → `jaeger-internal:16686/jaeger/*` with no path transformation. Jaeger handles the prefix natively. Simple, no response-body rewriting needed. Downside: Jaeger's own standalone URL (`jaeger.mydomain.com/`) also needs the prefix, or a second Jaeger instance without `base_path` must be run.
 
-2. **Prefix stripping + `<base href>` rewriting** (unvalidated): the ingress strips `/jaeger` before forwarding (Jaeger sees `/`), and rewrites `<base href="/" data-inject-target="BASE_URL" />` → `<base href="/jaeger/" ...>` in HTML responses. Would allow one Jaeger instance to serve at both its own domain (without prefix) and under Grafana's origin (with prefix). Depends on whether all SPA asset and API calls are relative (routed through `<base href>`) with no hardcoded absolute paths. **Requires experimental validation** — see Phase 3.5.
+2. **Prefix stripping only** (since Jaeger 2.18.0): the ingress strips `/jaeger` before forwarding (Jaeger sees `/`). Since Jaeger 2.18.0 the UI auto-detects its base path from `window.location` via an inline script ([ADR-009](https://github.com/jaegertracing/jaeger/blob/main/docs/adr/009-ui-base-path-auto-detection.md)) — no response-body rewriting of `<base href>` is needed. Allows one Jaeger instance to serve at both its own domain and under Grafana's origin prefix simultaneously.
+
+Both options are validated end-to-end in `examples/reverse-proxy/` — see Phase 3.5.
 
 **Current plugin role**: `jaegerPublicURL` is the single configuration point for the iframe base. It is intentionally generic — operators point it at whatever browser-accessible Jaeger origin they have. The plugin does not prescribe the deployment topology.
 
 **Limitations of the ingress approach:**
 - Requires ingress-level configuration by ops; not self-contained in the plugin.
-- Option 2 requires the ingress to support response body rewriting (`sub_filter` in nginx, Lua filter in Envoy). AWS ALB and simpler ingresses do not support this natively.
 - No fallback for deployments where the ingress cannot be reconfigured.
 
 **Post-completion decision (2026-05-09):** The Go binary was removed after determining it was fully redundant with Grafana's built-in DataProxy. All API proxying, health checks, and URL resolution are handled by the TypeScript datasource and `plugin.json` routes. See [Backend Binary: Decision](#backend-binary-decision) above.
@@ -288,25 +287,27 @@ Two approaches exist for the ingress:
 
 **Goal:** Validate programmatically that the Grafana plugin works when Jaeger is served behind a reverse proxy under a path prefix. Two proxy approaches are tested:
 
-- **Option 1** (transparent proxy + `--query.base-path`): the supported upstream pattern from `jaeger/examples/reverse-proxy/`.
-- **Option 2** (prefix stripping + `<base href>` rewriting): allows one Jaeger instance to serve at both its own domain and under a prefix, without `--query.base-path`.
+- **Option 1** (transparent proxy + `--query.base-path`): Jaeger configured with `base_path`, proxy passes paths through unchanged.
+- **Option 2** (prefix stripping only): proxy strips the prefix; Jaeger's inline base-path detection script (since 2.18.0) handles the rest without any response-body rewriting.
 
 **Implementation:** `examples/reverse-proxy/` in this repo — a self-contained docker-compose stack and a shell test script that runs without a browser.
 
 **Stack** (`examples/reverse-proxy/docker-compose.yaml`):
 
-- `jaeger`: internal only (no host `ports:`), simulating an unreachable-from-browser deployment. Configured with `--set extensions.jaeger_query.base_path=/jaeger/ui` for the option 1 test; a second service or profile uses no `base_path` for option 2.
-- `hotrod`: generates traces so the API returns real data.
-- `httpd-option1`: Apache proxying `http://localhost:18080/jaeger/ui/*` → `http://jaeger:16686/jaeger/ui/*` (transparent, no path transformation). Exposed to host at `:18080`.
-- `httpd-option2`: Apache proxying `http://localhost:18081/jaeger/ui/*` → `http://jaeger2:16686/*` with prefix stripping (`ProxyPass "/jaeger/ui/" "http://jaeger2:16686/"`) and `Substitute` rewriting `<base href="/" ...>` → `<base href="/jaeger/ui/" ...>` in HTML responses. Exposed to host at `:18081`.
+- `jaeger1`: internal only (no host `ports:`), configured with `--set extensions.jaeger_query.base_path=/jaeger/ui`.
+- `jaeger2`: internal only, no `base_path` (serves at root `/`).
+- `hotrod1`, `hotrod2`: generate traces so the API returns real data.
+- `httpd-option1`: Apache proxying `http://localhost:18080/jaeger/ui/*` → `http://jaeger1:16686/jaeger/ui/*` (transparent, no path transformation). Exposed to host at `:18080`.
+- `httpd-option2`: Apache proxying `http://localhost:18081/jaeger/ui/*` → `http://jaeger2:16686/*` with prefix stripping (`ProxyPass "/jaeger/ui/" "http://jaeger2:16686/"`). No `Substitute` rewriting needed since 2.18.0. Exposed to host at `:18081`.
+- `grafana`: Grafana with both datasources provisioned, exposed at `:18082`.
 
 **Test script** (`examples/reverse-proxy/test.sh`): uses `curl` and `jq` to assert without a browser:
 
 ```
 Option 1:
   1. GET http://localhost:18080/jaeger/ui/
-     Assert: HTTP 200, Content-Type: text/html,
-             response body contains <base href="/jaeger/ui/"
+     Assert: HTTP 200, response body contains inline script marker
+             data-inject-target="BASE_URL"
   2. GET http://localhost:18080/jaeger/ui/api/services
      Assert: HTTP 200, JSON body has .data array (non-empty after HotROD warmup)
   3. For each asset URL found in index.html: GET it through the proxy
@@ -314,8 +315,8 @@ Option 1:
 
 Option 2:
   4. GET http://localhost:18081/jaeger/ui/
-     Assert: HTTP 200, response body contains <base href="/jaeger/ui/"
-             (rewritten by Substitute, not set by Jaeger itself)
+     Assert: HTTP 200, response body contains inline script marker
+             (base path auto-detected by browser from window.location)
   5. GET http://localhost:18081/jaeger/ui/api/services
      Assert: HTTP 200, JSON body has .data array
   6. Same asset check as step 3
@@ -323,12 +324,12 @@ Option 2:
 
 The Grafana API call path (datasource DataProxy → Jaeger) is validated separately via the existing e2e tests. This script focuses purely on the ingress proxy layer.
 
-**Status: ✅ COMPLETE (2026-05-09) — 17 curl/jq + 8 Playwright assertions pass**
+**Status: ✅ COMPLETE — 17 curl/jq + 8 Playwright assertions pass**
 
 The test suite covers two layers:
 
 **Proxy layer** (curl/jq, `examples/reverse-proxy/test.sh`):
-- Both options serve `index.html` with correct `<base href="/jaeger/ui/">`.
+- Both options serve `index.html` with the inline base-path detection script (`data-inject-target="BASE_URL"` marker present).
 - `/api/services` returns non-empty data through both proxies.
 - All JS/CSS assets return HTTP 200 through both proxy paths.
 
@@ -338,7 +339,7 @@ The test suite covers two layers:
 - `jaegerPublicURL` is correctly provisioned to the proxy address for each datasource.
 - ConfigEditor shows the correct `jaegerPublicURL` value for each datasource (Playwright).
 
-**Conclusion**: Both proxy approaches are confirmed working end-to-end through Grafana. Option 2 (prefix stripping + `<base href>` rewriting) is the recommended approach for deployments that cannot change `--query.base-path`, since it allows one Jaeger instance to be accessed at both its own domain and under a Grafana origin prefix simultaneously.
+**Conclusion**: Both proxy approaches are confirmed working end-to-end through Grafana. Since Jaeger 2.18.0, Option 2 (prefix stripping) requires only a standard reverse proxy with no response-body rewriting, making it the simpler choice for deployments that need one Jaeger instance accessible under multiple prefixes.
 
 Reference configurations: `examples/reverse-proxy/httpd-option1.conf` and `examples/reverse-proxy/httpd-option2.conf` in this repo.
 
