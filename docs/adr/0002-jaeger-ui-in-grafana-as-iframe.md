@@ -73,7 +73,7 @@ The datasource TypeScript therefore calls Jaeger's API directly using `jaegerPub
 
 ### Health check — handled by TypeScript
 
-The user-facing **"Test" button** calls the TypeScript `testDatasource()` method, which calls `/api/services` through the DataProxy and reports success or failure. This is the check operators actually run. The Go `CheckHealth` only drove Grafana's background polling dot (the green/red indicator in the datasource list) — a minor UX nicety that doesn't justify a full binary.
+The user-facing **"Test" button** calls the TypeScript `testDatasource()` method, which calls `/api/services` directly from the browser and reports success or failure. This is the check operators actually run. The Go `CheckHealth` only drove Grafana's background polling dot (the green/red indicator in the datasource list) — a minor UX nicety that doesn't justify a full binary.
 
 ### What was removed
 
@@ -86,6 +86,14 @@ The user-facing **"Test" button** calls the TypeScript `testDatasource()` method
 ### Result
 
 The datasource config editor has a single field: **Jaeger UI URL** (`jaegerPublicURL`). This is the browser-accessible Jaeger origin used by both the panel iframe and all datasource API calls (`/api/services`, `/api/traces`, etc.). There is no server-side proxy path and no separate internal-URL field.
+
+### TODO: consolidate `jaegerPublicURL` into the standard datasource `url` field
+
+`jaegerPublicURL` is currently stored in `jsonData` (Grafana's plugin-specific free-form config blob) and exposed via a custom `ConfigEditor`. However, Grafana's standard datasource `url` field is now identical in purpose — the operator sets it to the same browser-accessible Jaeger origin — making `jsonData.jaegerPublicURL` redundant.
+
+The simplification: use `instanceSettings.url` everywhere (panel iframe + datasource API calls), remove the custom `ConfigEditor`, remove `jaegerPublicURL` from `types.ts` and provisioning files. Grafana's built-in URL field already provides the right UI and validation.
+
+This is deferred to a follow-up PR to preserve a clear git history for the custom ConfigEditor.
 
 ---
 
