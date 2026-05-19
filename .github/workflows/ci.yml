@@ -96,7 +96,7 @@ jobs:
           ARCHIVE: ${{ steps.metadata.outputs.archive }}
 
       - name: Archive Build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.metadata.outputs.plugin-id }}-${{ steps.metadata.outputs.plugin-version }}
           path: packages/panel/${{ steps.metadata.outputs.plugin-id }}
@@ -175,7 +175,7 @@ jobs:
             --config playwright/reverse-proxy.config.ts
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ always() && !cancelled() }}
         with:
           name: reverse-proxy-playwright-report
