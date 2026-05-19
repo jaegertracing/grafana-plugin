@@ -1,6 +1,6 @@
 import { FieldType } from '@grafana/data';
 import { getBackendSrv, getTemplateSrv } from '@grafana/runtime';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { JaegerDataSource } from './datasource';
 
 jest.mock('@grafana/runtime', () => ({
@@ -49,7 +49,7 @@ describe('JaegerDataSource — testDatasource', () => {
 
   it('returns error when fetch throws', async () => {
     mockGetBackendSrv.mockReturnValue({
-      fetch: jest.fn().mockReturnValue({ subscribe: (_: any, err: any) => { err(new Error('ECONNREFUSED')); return { unsubscribe: () => {} }; } }),
+      fetch: jest.fn().mockReturnValue(throwError(() => new Error('ECONNREFUSED'))),
     });
     const ds = makeInstance();
     const result = await ds.testDatasource();
