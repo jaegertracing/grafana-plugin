@@ -1,6 +1,6 @@
-# Jaeger Panel Plugin for Grafana
+# Jaeger Plugins for Grafana
 
-A Grafana panel plugin that embeds [Jaeger](https://www.jaegertracing.io/) trace visualizations inside Grafana dashboards using Jaeger's built-in `uiEmbed=v0` mode.
+Two Grafana plugins for embedding [Jaeger](https://www.jaegertracing.io/) trace visualizations in Grafana dashboards: a **datasource plugin** that connects to a Jaeger Query service, and a **panel plugin** that renders Jaeger's UI in an iframe using Jaeger's built-in `uiEmbed=v0` mode.
 
 ## Overview
 
