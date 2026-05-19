@@ -80,20 +80,13 @@ The user-facing **"Test" button** calls the TypeScript `testDatasource()` method
 - `packages/datasource/pkg/` (main.go, plugin.go, proxy.go)
 - `packages/datasource/Magefile.go`, `go.mod`, `go.sum`
 - `"backend": true` and `"executable": "gpx_jaeger"` from `plugin.json`
-- `proxyMode` and `jaegerInternalURL` fields from `types.ts` and `ConfigEditor`
+- `proxyMode`, `jaegerInternalURL`, and `jaegerPublicURL` fields from `types.ts`
+- Custom `ConfigEditor` component (standard Grafana datasource `url` field is sufficient)
 - Makefile `build-backend` and `vet-backend` targets
 
 ### Result
 
-The datasource config editor has a single field: **Jaeger UI URL** (`jaegerPublicURL`). This is the browser-accessible Jaeger origin used by both the panel iframe and all datasource API calls (`/api/services`, `/api/traces`, etc.). There is no server-side proxy path and no separate internal-URL field.
-
-### TODO: consolidate `jaegerPublicURL` into the standard datasource `url` field
-
-`jaegerPublicURL` is currently stored in `jsonData` (Grafana's plugin-specific free-form config blob) and exposed via a custom `ConfigEditor`. However, Grafana's standard datasource `url` field is now identical in purpose — the operator sets it to the same browser-accessible Jaeger origin — making `jsonData.jaegerPublicURL` redundant.
-
-The simplification: use `instanceSettings.url` everywhere (panel iframe + datasource API calls), remove the custom `ConfigEditor`, remove `jaegerPublicURL` from `types.ts` and provisioning files. Grafana's built-in URL field already provides the right UI and validation.
-
-This is deferred to a follow-up PR to preserve a clear git history for the custom ConfigEditor.
+The datasource uses Grafana's standard `url` field — the browser-accessible Jaeger origin — for both the panel iframe and all API calls (`/api/services`, `/api/traces`, etc.). There is no custom `ConfigEditor`, no plugin-specific `jsonData` fields, and no server-side proxy path. The standard Grafana datasource config page provides the URL input.
 
 ---
 
@@ -338,11 +331,11 @@ The test suite covers two layers:
 - Both options serve `index.html` with the inline base-path detection script (`data-inject-target="BASE_URL"` marker present).
 - `/api/services` returns non-empty data through both proxies.
 - All JS/CSS assets return HTTP 200 through both proxy paths.
-- `jaegerPublicURL` is correctly provisioned for each datasource.
+- Datasource `url` is correctly provisioned for each datasource.
 
 **Grafana integration layer** (Playwright, `tests/reverse-proxy.spec.ts`): 6 assertions pass:
 - `/api/services` returns data via `jaegerPublicURL` directly from the browser (browser → httpd → Jaeger).
-- `jaegerPublicURL` is correctly provisioned to the proxy address for each datasource.
+- Datasource `url` is correctly provisioned to the proxy address for each datasource.
 - ConfigEditor shows the correct `jaegerPublicURL` value for each datasource.
 
 Note: `GET /api/datasources/uid/:uid/health` returns "plugin unavailable" for frontend-only plugins (no Go backend process) in Grafana 12.4.0 — this is expected; the DataProxy test covers the equivalent connectivity check.

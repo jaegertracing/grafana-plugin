@@ -6,5 +6,3 @@ datasources:
     type: jaegertracing-jaeger-datasource
     url: http://localhost:16686
     isDefault: true
-    jsonData:
-      jaegerPublicURL: http://localhost:16686

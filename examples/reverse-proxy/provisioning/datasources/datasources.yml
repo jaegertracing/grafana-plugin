@@ -7,13 +7,9 @@ datasources:
     type: jaegertracing-jaeger-datasource
     url: http://localhost:18080/jaeger/ui
     isDefault: true
-    jsonData:
-      jaegerPublicURL: http://localhost:18080/jaeger/ui
 
   # Option 2: prefix-stripping proxy, base path auto-detected by Jaeger UI (since 2.18.0)
   - name: Jaeger-Option2
     uid: jaeger-option2
     type: jaegertracing-jaeger-datasource
     url: http://localhost:18081/jaeger/ui
-    jsonData:
-      jaegerPublicURL: http://localhost:18081/jaeger/ui

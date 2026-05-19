@@ -11,9 +11,7 @@ export interface JaegerQuery extends DataQuery {
   queryType?: 'trace' | 'search';
 }
 
-export interface JaegerDataSourceOptions extends DataSourceJsonData {
-  jaegerPublicURL?: string;
-}
+export type JaegerDataSourceOptions = DataSourceJsonData;
 
 export const DEFAULT_QUERY: Partial<JaegerQuery> = {
   queryType: 'search',

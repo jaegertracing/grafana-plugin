@@ -17,10 +17,9 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
   constructor(instanceSettings: DataSourceInstanceSettings<JaegerDataSourceOptions>) {
     super(instanceSettings);
-    // jaegerPublicURL is the browser-accessible Jaeger origin — the same URL used by the
-    // panel iframe. Since the iframe requires the browser to reach Jaeger directly, all
-    // API calls (services, traces) can use the same URL from the browser too.
-    this.baseUrl = instanceSettings.jsonData.jaegerPublicURL ?? '';
+    // instanceSettings.url is the datasource URL configured by the operator — the same
+    // browser-accessible Jaeger origin used by the panel iframe.
+    this.baseUrl = instanceSettings.url ?? '';
   }
 
   async query(request: DataQueryRequest<JaegerQuery>): Promise<DataQueryResponse> {

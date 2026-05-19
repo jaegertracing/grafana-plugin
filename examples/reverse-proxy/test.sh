@@ -91,17 +91,17 @@ assert_assets_load() {
     fi
 }
 
-# Verify jaegerPublicURL in datasource settings matches the expected proxy URL.
+# Verify the datasource url field matches the expected proxy URL.
 # This is the URL the panel uses as the iframe src base and for all API calls.
-assert_jaeger_public_url() {
+assert_datasource_url() {
     local label="$1" uid="$2" expected="$3"
-    local url="$GRAFANA_URL/api/datasources/uid/$uid"
+    local api_url="$GRAFANA_URL/api/datasources/uid/$uid"
     local actual
-    actual=$(curl -s "$url" | jq -r '.jsonData.jaegerPublicURL' 2>/dev/null || echo "")
+    actual=$(curl -s "$api_url" | jq -r '.url' 2>/dev/null || echo "")
     if [[ "$actual" == "$expected" ]]; then
-        pass "$label — jaegerPublicURL=$actual"
+        pass "$label — url=$actual"
     else
-        fail "$label — jaegerPublicURL: expected $expected, got $actual ($url)"
+        fail "$label — url: expected $expected, got $actual ($api_url)"
     fi
 }
 
@@ -160,8 +160,8 @@ assert_assets_load   "Option2 assets"               "$OPTION2_URL"
 echo ""
 echo "--- Grafana integration: datasource provisioning ---"
 
-assert_jaeger_public_url "Option1 public URL" "jaeger-option1" "http://localhost:18080/jaeger/ui"
-assert_jaeger_public_url "Option2 public URL" "jaeger-option2" "http://localhost:18081/jaeger/ui"
+assert_datasource_url "Option1 datasource URL" "jaeger-option1" "http://localhost:18080/jaeger/ui"
+assert_datasource_url "Option2 datasource URL" "jaeger-option2" "http://localhost:18081/jaeger/ui"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

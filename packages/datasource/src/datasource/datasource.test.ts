@@ -12,15 +12,15 @@ jest.mock('@grafana/runtime', () => ({
 const mockGetBackendSrv = getBackendSrv as jest.Mock;
 const mockGetTemplateSrv = getTemplateSrv as jest.Mock;
 
-function makeInstance(jaegerPublicURL = 'http://localhost:16686') {
+function makeInstance(url = 'http://localhost:16686') {
   return new JaegerDataSource({
     uid: 'test-uid',
     id: 1,
     name: 'Jaeger',
     type: 'jaegertracing-jaeger-datasource',
-    url: '',
+    url,
     access: 'proxy',
-    jsonData: { jaegerPublicURL },
+    jsonData: {},
     readOnly: false,
   } as any);
 }
@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 describe('JaegerDataSource — constructor', () => {
-  it('uses jaegerPublicURL as baseUrl', () => {
+  it('uses instanceSettings.url as baseUrl', () => {
     const ds = makeInstance('http://jaeger.example.com/jaeger');
     expect(ds.baseUrl).toBe('http://jaeger.example.com/jaeger');
   });
