@@ -32,7 +32,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonD
     return { data: results.flat() };
   }
 
-  private async runQuery(query: JaegerQuery, range: TimeRange): Promise<MutableDataFrame[]> {
+  private async runQuery(query: JaegerQuery, range: TimeRange): Promise<ReturnType<typeof createDataFrame>[]> {
     const interpolated: JaegerQuery = {
       ...query,
       traceId: query.traceId ? getTemplateSrv().replace(query.traceId) : query.traceId,

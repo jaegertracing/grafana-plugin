@@ -7,7 +7,7 @@
 
 ## TL;DR
 
-Implements the iframe rendering approach decided in [ADR 0001](./0001-jaeger-ui-in-grafana.md). A panel plugin renders `<iframe src={jaegerUrl}>` and a datasource plugin provides Explore integration and Jaeger API access. The datasource is frontend-only — API calls route through Grafana's built-in DataProxy via `plugin.json` routes, with no Go backend binary. The Jaeger SPA (single page app) itself must always be served from a browser-reachable origin; Grafana's proxy infrastructure cannot serve executable JavaScript due to a universal `Content-Security-Policy: sandbox` header.
+Implements the iframe rendering approach decided in [ADR 0001](./0001-jaeger-ui-in-grafana.md). A panel plugin renders `<iframe src={jaegerUrl}>` and a datasource plugin provides Explore integration and Jaeger API access. The datasource is frontend-only — API calls go directly from the browser to Jaeger using the datasource's `url` field, with no Go backend binary and no server-side proxy. The Jaeger SPA (single page app) must always be served from a browser-reachable origin; Grafana's proxy infrastructure cannot serve executable JavaScript due to a universal `Content-Security-Policy: sandbox` header.
 
 ---
 
@@ -33,7 +33,7 @@ grafana-plugin/
 │   │   └── package.json
 │   └── datasource/           # Datasource plugin (jaegertracing-jaeger-datasource)
 │       ├── src/
-│       │   ├── components/   # ConfigEditor, QueryEditor
+│       │   ├── components/   # QueryEditor
 │       │   ├── datasource/   # DataSource class + tests
 │       │   ├── types.ts
 │       │   ├── module.ts
@@ -254,7 +254,7 @@ Browser ──HTTPS──▶ Ingress (grafana.mydomain.com)
            └──────────────────────────────────────────────┘
 ```
 
-- **No plugin changes needed.** Set `jaegerPublicURL: https://grafana.mydomain.com/jaeger`.
+- **No plugin changes needed.** Set the datasource **URL** to `https://grafana.mydomain.com/jaeger`.
 - SSO is handled by the ingress for all `grafana.mydomain.com` traffic.
 - If `--query.bearer-token-propagation` is enabled, the ingress can forward the user's JWT for per-user storage access control.
 
@@ -268,13 +268,13 @@ Two approaches exist for the ingress:
 
 Both options are validated end-to-end in `examples/reverse-proxy/` — see Phase 3.5.
 
-**Current plugin role**: `jaegerPublicURL` is the single configuration point for the iframe base. It is intentionally generic — operators point it at whatever browser-accessible Jaeger origin they have. The plugin does not prescribe the deployment topology.
+**Current plugin role**: The datasource `url` field is the single configuration point — the browser-accessible Jaeger origin used for both the iframe and all API calls. It is intentionally generic — operators point it at whatever browser-accessible Jaeger origin they have. The plugin does not prescribe the deployment topology.
 
 **Limitations of the ingress approach:**
 - Requires ingress-level configuration by ops; not self-contained in the plugin.
 - No fallback for deployments where the ingress cannot be reconfigured.
 
-**Post-completion decision (2026-05-09):** The Go binary was removed after determining it was fully redundant with Grafana's built-in DataProxy. All API proxying, health checks, and URL resolution are handled by the TypeScript datasource and `plugin.json` routes. See [Backend Binary: Decision](#backend-binary-decision) above.
+**Post-completion decision (2026-05-09):** The Go binary was removed after determining it was fully redundant. All API calls, health checks, and URL resolution are handled by the TypeScript datasource calling Jaeger directly from the browser. See [Backend Binary: Decision](#backend-binary-decision) above.
 
 **Exit criterion met (then superseded):** Proxy mode worked for datasource API calls. Decision: simplify to frontend-only plugin.
 
@@ -334,11 +334,11 @@ The test suite covers two layers:
 - Datasource `url` is correctly provisioned for each datasource.
 
 **Grafana integration layer** (Playwright, `tests/reverse-proxy.spec.ts`): 6 assertions pass:
-- `/api/services` returns data via `jaegerPublicURL` directly from the browser (browser → httpd → Jaeger).
+- `/api/services` returns data via the datasource `url` directly from the browser (browser → httpd → Jaeger).
 - Datasource `url` is correctly provisioned to the proxy address for each datasource.
-- ConfigEditor shows the correct `jaegerPublicURL` value for each datasource.
+- Config page loads and the datasource name is correct for each datasource.
 
-Note: `GET /api/datasources/uid/:uid/health` returns "plugin unavailable" for frontend-only plugins (no Go backend process) in Grafana 12.4.0 — this is expected; the DataProxy test covers the equivalent connectivity check.
+Note: `GET /api/datasources/uid/:uid/health` returns "plugin unavailable" for frontend-only plugins (no Go backend process) in Grafana 12.4.0 — this is expected.
 
 **Conclusion**: Both proxy approaches confirmed working end-to-end through Grafana 12.4.0 with Jaeger 2.18.0. Since Jaeger 2.18.0, Option 2 (prefix stripping) requires only a standard reverse proxy with no response-body rewriting, making it the simpler choice for deployments that need one Jaeger instance accessible under multiple prefixes.
 
