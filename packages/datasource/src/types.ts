@@ -1,4 +1,5 @@
-import { DataQuery, DataSourceJsonData } from '@grafana/data';
+import { DataQuery } from '@grafana/schema';
+import { DataSourceJsonData } from '@grafana/data';
 
 export interface JaegerQuery extends DataQuery {
   traceId?: string;

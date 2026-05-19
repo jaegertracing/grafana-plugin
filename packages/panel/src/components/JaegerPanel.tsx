@@ -103,7 +103,7 @@ function traceIdFromData(data: Props['data']): string | null {
   for (const frame of data.series) {
     const field = frame.fields.find((f) => f.name === 'traceID' && f.type === FieldType.string);
     if (field && frame.length === 1) {
-      const value = field.values.get ? field.values.get(0) : (field.values as unknown as string[])[0];
+      const value = (field.values as unknown as string[])[0];
       if (typeof value === 'string' && value) {
         return value;
       }

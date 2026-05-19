@@ -86,7 +86,7 @@ describe('JaegerDataSource — query (trace mode)', () => {
     expect(frame.length).toBe(1);
     const field = frame.fields.find((f: any) => f.name === 'traceID' && f.type === FieldType.string);
     expect(field).toBeDefined();
-    expect(field.values.get ? field.values.get(0) : field.values[0]).toBe('abc123');
+    expect(field.values[0]).toBe('abc123');
   });
 
   it('returns empty data when traceId is blank', async () => {
@@ -143,9 +143,9 @@ describe('JaegerDataSource — query (search mode)', () => {
     const frame = result.data[0];
     expect(frame.name).toBe('traces');
     const traceIdField = frame.fields.find((f: any) => f.name === 'traceID');
-    expect(traceIdField.values.get ? traceIdField.values.get(0) : traceIdField.values[0]).toBe('trace1');
+    expect(traceIdField.values[0]).toBe('trace1');
     const traceNameField = frame.fields.find((f: any) => f.name === 'traceName');
-    expect(traceNameField.values.get ? traceNameField.values.get(0) : traceNameField.values[0]).toBe('frontend: HTTP GET /dispatch');
+    expect(traceNameField.values[0]).toBe('frontend: HTTP GET /dispatch');
   });
 
   it('returns empty data when no service is provided', async () => {

@@ -5,8 +5,8 @@ import {
   DataSourceApi,
   DataSourceInstanceSettings,
   FieldType,
-  MutableDataFrame,
   TimeRange,
+  createDataFrame,
 } from '@grafana/data';
 import { getBackendSrv, getTemplateSrv, isFetchError } from '@grafana/runtime';
 import { lastValueFrom } from 'rxjs';
@@ -45,18 +45,16 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     return interpolated.service ? this.fetchTraces(interpolated, range) : [];
   }
 
-  private fetchTrace(traceId: string): MutableDataFrame[] {
+  private fetchTrace(traceId: string): ReturnType<typeof createDataFrame>[] {
     // No API call needed: the panel renders the trace via iframe, which fetches it directly.
-    const frame = new MutableDataFrame({
+    return [createDataFrame({
       name: traceId,
       meta: { preferredVisualisationPluginId: 'jaegertracing-jaeger-panel' },
-      fields: [{ name: 'traceID', type: FieldType.string }],
-    });
-    frame.add({ traceID: traceId });
-    return [frame];
+      fields: [{ name: 'traceID', type: FieldType.string, values: [traceId] }],
+    })];
   }
 
-  private async fetchTraces(query: JaegerQuery, range: TimeRange): Promise<MutableDataFrame[]> {
+  private async fetchTraces(query: JaegerQuery, range: TimeRange): Promise<ReturnType<typeof createDataFrame>[]> {
     const params = new URLSearchParams({ service: query.service ?? '' });
     // Jaeger expects start/end in microseconds
     params.set('start', String(range.from.valueOf() * 1000));
@@ -113,15 +111,10 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       },
     };
 
-    const frame = new MutableDataFrame({
-      name: 'traces',
-      fields: [
-        { name: 'traceID', type: FieldType.string, config: { links: [traceLink] } },
-        { name: 'traceName', type: FieldType.string },
-        { name: 'spanCount', type: FieldType.number },
-        { name: 'duration', type: FieldType.number, config: { unit: 'µs' } },
-      ],
-    });
+    const traceIDs: string[] = [];
+    const traceNames: string[] = [];
+    const spanCounts: number[] = [];
+    const durations: number[] = [];
 
     for (const trace of response.data.data ?? []) {
       const spans: JaegerSpan[] = Array.isArray(trace.spans) ? trace.spans : [];
@@ -130,15 +123,21 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
         ?? spans.reduce((a, b) => (a.startTime < b.startTime ? a : b), spans[0]);
       const service = rootSpan ? (trace.processes[rootSpan.processID]?.serviceName ?? '') : '';
       const operation = rootSpan?.operationName ?? '';
-      frame.add({
-        traceID: trace.traceID,
-        traceName: service && operation ? `${service}: ${operation}` : operation,
-        spanCount: spans.length,
-        duration: rootSpan?.duration ?? 0,
-      });
+      traceIDs.push(trace.traceID);
+      traceNames.push(service && operation ? `${service}: ${operation}` : operation);
+      spanCounts.push(spans.length);
+      durations.push(rootSpan?.duration ?? 0);
     }
 
-    return [frame];
+    return [createDataFrame({
+      name: 'traces',
+      fields: [
+        { name: 'traceID', type: FieldType.string, values: traceIDs, config: { links: [traceLink] } },
+        { name: 'traceName', type: FieldType.string, values: traceNames },
+        { name: 'spanCount', type: FieldType.number, values: spanCounts },
+        { name: 'duration', type: FieldType.number, values: durations, config: { unit: 'µs' } },
+      ],
+    })];
   }
 
   async testDatasource(): Promise<{ status: string; message: string }> {
