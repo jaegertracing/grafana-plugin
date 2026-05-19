@@ -24,6 +24,7 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
           placeholder="http://localhost:16686"
           width={40}
           onChange={onJaegerPublicURLChange}
+          data-testid="jaeger-public-url-input"
         />
       </InlineField>
     </InlineFieldRow>

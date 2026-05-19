@@ -70,8 +70,8 @@ make test-reverse-proxy
 
 This target:
 1. Starts `examples/reverse-proxy/docker-compose.yaml` in detached mode.
-2. Runs `examples/reverse-proxy/test.sh` — 17 curl/jq assertions covering the proxy layer (HTTP responses, `<base href>` rewriting) and Grafana integration (DataProxy `/api/services`, health check, `jaegerPublicURL` field).
-3. Runs Playwright tests (`tests/reverse-proxy.spec.ts`) against Grafana at port 18082 — 8 assertions covering DataProxy, health check, `jaegerPublicURL`, and the datasource ConfigEditor field value.
+2. Runs `examples/reverse-proxy/test.sh` — 14 curl/jq assertions covering the proxy layer (HTTP responses, `data-inject-target="BASE_URL"` presence) and Grafana integration (DataProxy `/api/services`, `jaegerPublicURL` field).
+3. Runs Playwright tests (`tests/reverse-proxy.spec.ts`) against Grafana at port 18082 — 6 assertions covering DataProxy, `jaegerPublicURL`, and the datasource ConfigEditor field value.
 4. Tears down the stack regardless of test outcome.
 
 The two proxy strategies tested:
@@ -79,7 +79,7 @@ The two proxy strategies tested:
 | Option | Strategy |
 |--------|----------|
 | Option 1 | Transparent proxy + `--query.base-path=/jaeger/ui` passed to Jaeger |
-| Option 2 | Prefix stripping in httpd + `Substitute` directive rewrites `<base href>` in HTML responses |
+| Option 2 | Prefix stripping in httpd; Jaeger UI auto-detects base path from `window.location` (since Jaeger 2.18.0) |
 
 Reverse-proxy tests also run in CI as the `reverse-proxy-tests` job. Run them locally before submitting changes to `examples/reverse-proxy/`.
 

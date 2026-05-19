@@ -33,7 +33,7 @@ const DATASOURCES = [
 for (const ds of DATASOURCES) {
   test(`${ds.label}: DataProxy /api/services returns data`, async ({ request }) => {
     const resp = await request.get(`/api/datasources/proxy/uid/${ds.uid}/api/services`);
-    expect(resp.ok()).toBeTruthy();
+    await expect(resp).toBeOK();
     const body = await resp.json();
     expect(Array.isArray(body.data)).toBe(true);
     expect(body.data.length).toBeGreaterThan(0);
@@ -51,9 +51,7 @@ for (const ds of DATASOURCES) {
     // shows the proxy address. This confirms the panel would render the iframe
     // pointing at the correct proxy-prefixed URL.
     await page.goto(`/connections/datasources/edit/${ds.uid}`);
-    // Grafana's InlineField renders the label as a div, not a <label for=...>,
-    // so getByLabel doesn't work. Use the placeholder, which we control in ConfigEditor.tsx.
-    const urlInput = page.getByPlaceholder('http://localhost:16686');
+    const urlInput = page.getByTestId('jaeger-public-url-input');
     await expect(urlInput).toBeVisible({ timeout: 10000 });
     await expect(urlInput).toHaveValue(ds.expectedPublicURL);
   });

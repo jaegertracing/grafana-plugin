@@ -18,6 +18,7 @@
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },
+  "backend": false,
   "metrics": true,
   "tracing": true,
   "dependencies": {
