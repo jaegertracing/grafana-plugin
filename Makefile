@@ -1,4 +1,4 @@
-.PHONY: build test lint server test-reverse-proxy panel-% datasource-%
+.PHONY: build test lint server test-reverse-proxy bump-version panel-% datasource-%
 
 build:
 	npm run build
@@ -22,6 +22,11 @@ test-reverse-proxy:
 	  status=$$?; \
 	  docker compose -f examples/reverse-proxy/docker-compose.yaml down; \
 	  exit $$status
+
+# Usage: make bump-version VERSION=0.2.0
+# Updates package.json in both plugins, then: git commit -s -m "chore: bump version to $(VERSION)" && git tag v$(VERSION) && git push --follow-tags
+bump-version:
+	npm version --no-git-tag-version $(VERSION) --workspace packages/panel --workspace packages/datasource
 
 panel-%:
 	npm run $* --workspace=packages/panel

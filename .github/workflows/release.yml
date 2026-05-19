@@ -1,11 +1,9 @@
-# This GitHub Action automates the process of building Grafana plugins.
-# (For more information, see https://github.com/grafana/plugin-actions/blob/main/build-plugin/README.md)
 name: Release
 
 on:
   push:
     tags:
-      - 'v*' # Run workflow on version tags, e.g. v1.0.0.
+      - 'v*'
 
 permissions: read-all
 
@@ -19,11 +17,70 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: grafana/plugin-actions/build-plugin@build-plugin/v1.2.0
-        # Uncomment to enable plugin signing
-        # (For more info on how to generate the access policy token see https://grafana.com/developers/plugin-tools/publish-a-plugin/sign-a-plugin#generate-an-access-policy-token)
-        #with:
-        # Make sure to save the token in your repository secrets
-        #policy_token: $
-        # Usage of GRAFANA_API_KEY is deprecated, prefer `policy_token` option above
-        #grafana_token: $
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package.json versions match tag
+        run: |
+          PANEL_VER=$(jq -r .version packages/panel/package.json)
+          DS_VER=$(jq -r .version packages/datasource/package.json)
+          TAG_VER="${{ steps.version.outputs.version }}"
+          if [ "$PANEL_VER" != "$TAG_VER" ] || [ "$DS_VER" != "$TAG_VER" ]; then
+            echo "Tag v${TAG_VER} does not match package.json versions (panel=${PANEL_VER}, datasource=${DS_VER})."
+            echo "Run: make bump-version VERSION=${TAG_VER} && git commit -s -m 'chore: bump version to ${TAG_VER}' && git tag v${TAG_VER}"
+            exit 1
+          fi
+
+      - name: Build panel plugin
+        run: npm run build --workspace=packages/panel
+
+      - name: Build datasource plugin
+        run: npm run build --workspace=packages/datasource
+
+      - name: Package plugins
+        id: package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          PANEL_ID="jaegertracing-jaeger-panel"
+          DS_ID="jaegertracing-jaeger-datasource"
+          PANEL_ZIP="${PANEL_ID}-${VERSION}.zip"
+          DS_ZIP="${DS_ID}-${VERSION}.zip"
+
+          (cd packages/panel && mv dist "${PANEL_ID}" && zip -r "../../${PANEL_ZIP}" "${PANEL_ID}")
+          (cd packages/datasource && mv dist "${DS_ID}" && zip -r "../../${DS_ZIP}" "${DS_ID}")
+
+          sha256sum "${PANEL_ZIP}" "${DS_ZIP}" > checksums.txt
+
+          echo "panel-zip=${PANEL_ZIP}" >> "$GITHUB_OUTPUT"
+          echo "ds-zip=${DS_ZIP}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate panel plugin
+        run: |
+          docker run --rm \
+            -v "$PWD/${{ steps.package.outputs.panel-zip }}:/archive.zip" \
+            grafana/plugin-validator-cli -analyzer=metadatavalid /archive.zip
+
+      - name: Validate datasource plugin
+        run: |
+          docker run --rm \
+            -v "$PWD/${{ steps.package.outputs.ds-zip }}:/archive.zip" \
+            grafana/plugin-validator-cli -analyzer=metadatavalid /archive.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            ${{ steps.package.outputs.panel-zip }}
+            ${{ steps.package.outputs.ds-zip }}
+            checksums.txt
