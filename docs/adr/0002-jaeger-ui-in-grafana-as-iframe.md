@@ -326,7 +326,7 @@ The Grafana API call path (datasource DataProxy → Jaeger) is validated separat
 
 **Status: ✅ COMPLETE — validated locally via `make test-reverse-proxy` (Jaeger 2.18.0, Grafana 12.4.0)**
 
-> Tests run locally only; not part of CI. See CONTRIBUTING.md.
+> Tests run locally via `make test-reverse-proxy` and in CI as the `reverse-proxy-tests` job. See CONTRIBUTING.md.
 
 The test suite covers two layers:
 

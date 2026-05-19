@@ -81,7 +81,7 @@ The two proxy strategies tested:
 | Option 1 | Transparent proxy + `--query.base-path=/jaeger/ui` passed to Jaeger |
 | Option 2 | Prefix stripping in httpd + `Substitute` directive rewrites `<base href>` in HTML responses |
 
-Reverse-proxy tests are not run in CI (they require Docker networking and ports not available in the CI sandbox). Run them locally before submitting changes to `examples/reverse-proxy/`.
+Reverse-proxy tests also run in CI as the `reverse-proxy-tests` job. Run them locally before submitting changes to `examples/reverse-proxy/`.
 
 ## CI pipeline
 
@@ -93,7 +93,7 @@ The GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and 
 4. **playwright-tests**: runs the direct deployment e2e tests (`tests/panel.spec.ts`) against each resolved Grafana version using `packages/panel/docker-compose.yaml`
 5. **publish-report**: publishes the Playwright HTML report to GitHub Pages
 
-The reverse-proxy e2e tests (`make test-reverse-proxy`) are **not** run in CI.
+The reverse-proxy e2e tests also run in CI as the `reverse-proxy-tests` job (`build` → `reverse-proxy-tests`).
 
 ## Lint
 
