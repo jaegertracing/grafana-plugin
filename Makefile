@@ -25,6 +25,7 @@ test-reverse-proxy:
 
 # Usage: make build-release VERSION=0.2.0
 # Builds both plugins, packages them as zips, and generates dist/checksums.txt.
+# package.json files are temporarily updated then restored; working tree is clean after.
 build-release:
 ifndef VERSION
 	$(error VERSION is not set. Usage: make build-release VERSION=0.2.0)
@@ -33,7 +34,8 @@ endif
 		--workspace packages/panel \
 		--workspace packages/datasource
 	$(MAKE) build
-	rm -rf dist/jaegertracing-jaeger-panel dist/jaegertracing-jaeger-datasource
+	git checkout packages/panel/package.json packages/datasource/package.json
+	rm -rf dist
 	mkdir -p dist
 	mv packages/panel/dist dist/jaegertracing-jaeger-panel
 	mv packages/datasource/dist dist/jaegertracing-jaeger-datasource
