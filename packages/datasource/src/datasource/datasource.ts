@@ -20,7 +20,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonD
     super(instanceSettings);
     // instanceSettings.url is the datasource URL configured by the operator — the same
     // browser-accessible Jaeger origin used by the panel iframe.
-    this.baseUrl = instanceSettings.url ?? '';
+    this.baseUrl = (instanceSettings.url ?? '').replace(/\/+$/, '');
   }
 
   async query(request: DataQueryRequest<JaegerQuery>): Promise<DataQueryResponse> {

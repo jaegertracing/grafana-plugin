@@ -3,7 +3,7 @@
  *
  * Runs against the Grafana instance in examples/reverse-proxy/ (port 18082),
  * which has two Jaeger datasources pointing at httpd reverse proxies:
- *   - jaeger-option1: transparent proxy + --query.base-path
+ *   - jaeger-option1: transparent proxy + base_path configured
  *   - jaeger-option2: prefix stripping (base path auto-detected by UI since Jaeger 2.18.0)
  *
  * The Grafana in this stack has anonymous Admin auth enabled, so no login needed.
@@ -32,6 +32,10 @@ const DATASOURCES = [
 
 for (const ds of DATASOURCES) {
   test(`${ds.label}: /api/services returns data via public URL`, async ({ request }) => {
+    // Uses Playwright's request context (outside the browser) to validate proxy-layer
+    // reachability — the same network path the browser datasource code will take.
+    // CORS is not a concern here: in the recommended same-origin ingress deployment
+    // the API calls are same-origin (Jaeger served under the Grafana origin prefix).
     const resp = await request.get(`${ds.expectedPublicURL}/api/services`);
     await expect(resp).toBeOK();
     const body = await resp.json();
