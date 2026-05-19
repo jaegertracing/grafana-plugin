@@ -32,7 +32,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonD
     return { data: results.flat() };
   }
 
-  private async runQuery(query: JaegerQuery, range: TimeRange): Promise<ReturnType<typeof createDataFrame>[]> {
+  private async runQuery(query: JaegerQuery, range: TimeRange): Promise<Array<ReturnType<typeof createDataFrame>>> {
     const interpolated: JaegerQuery = {
       ...query,
       traceId: query.traceId ? getTemplateSrv().replace(query.traceId) : query.traceId,
@@ -46,7 +46,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonD
     return interpolated.service ? this.fetchTraces(interpolated, range) : [];
   }
 
-  private fetchTrace(traceId: string): ReturnType<typeof createDataFrame>[] {
+  private fetchTrace(traceId: string): Array<ReturnType<typeof createDataFrame>> {
     // No API call needed: the panel renders the trace via iframe, which fetches it directly.
     return [createDataFrame({
       name: traceId,
@@ -55,7 +55,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonD
     })];
   }
 
-  private async fetchTraces(query: JaegerQuery, range: TimeRange): Promise<ReturnType<typeof createDataFrame>[]> {
+  private async fetchTraces(query: JaegerQuery, range: TimeRange): Promise<Array<ReturnType<typeof createDataFrame>>> {
     const params = new URLSearchParams({ service: query.service ?? '' });
     // Jaeger expects start/end in microseconds
     params.set('start', String(range.from.valueOf() * 1000));
