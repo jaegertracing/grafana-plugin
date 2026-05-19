@@ -18,8 +18,8 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
   constructor(instanceSettings: DataSourceInstanceSettings<JaegerDataSourceOptions>) {
     super(instanceSettings);
     // API calls go through Grafana's built-in DataProxy (the "routes" entry in plugin.json).
-    // instanceSettings.url resolves to /api/datasources/proxy/uid/<uid>, which Grafana
-    // forwards server-side to <datasource url>/api/* — no Go binary needed.
+    // When access=proxy (server), instanceSettings.url is /api/datasources/proxy/uid/<uid>
+    // and Grafana forwards requests server-side to <datasource url>/api/*.
     this.proxyUrl = instanceSettings.url!;
   }
 
