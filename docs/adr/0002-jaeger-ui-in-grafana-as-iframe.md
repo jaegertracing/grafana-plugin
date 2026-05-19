@@ -65,9 +65,9 @@ Grafana plugins can be frontend-only (`"backend": false`) or full-stack (`"backe
 
 ### API call proxying — not needed; browser reaches Jaeger directly
 
-The panel plugin renders a `<iframe src={jaegerPublicURL}>`. Since the Jaeger SPA must run in the browser (Grafana's proxy infrastructure unconditionally adds `Content-Security-Policy: sandbox` — see Phase 3 below), the browser **must** already have a direct network path to `jaegerPublicURL`. If the browser can load the SPA it can also call `/api/services`, `/api/traces`, etc. at the same origin.
+The panel plugin renders a `<iframe src={datasourceUrl}>`. Since the Jaeger SPA must run in the browser (Grafana's proxy infrastructure unconditionally adds `Content-Security-Policy: sandbox` — see Phase 3 below), the browser **must** already have a direct network path to the datasource URL. If the browser can load the SPA it can also call `/api/services`, `/api/traces`, etc. at the same origin.
 
-The datasource TypeScript therefore calls Jaeger's API directly using `jaegerPublicURL` as the base URL — no intermediary proxy of any kind. This eliminates a round-trip through the Grafana server for every search and service-discovery request.
+The datasource TypeScript therefore calls Jaeger's API directly using `instanceSettings.url` as the base URL — no intermediary proxy of any kind. This eliminates a round-trip through the Grafana server for every search and service-discovery request.
 
 **CORS consideration:** Direct browser-to-Jaeger API calls require either same-origin access or Jaeger to emit appropriate CORS headers. In the recommended ingress deployment (Jaeger served under a path prefix on the same origin as Grafana) there is no cross-origin request at all — both the iframe and the API calls go to `grafana.mydomain.com/jaeger/...`. In a split-origin deployment (`grafana.mydomain.com` + `jaeger.mydomain.com`) CORS headers on Jaeger would be needed for the API calls, but the iframe would also fail due to third-party cookie blocking in that scenario (see SSO section below), making a same-origin ingress the correct solution for both problems simultaneously.
 
@@ -389,7 +389,7 @@ Reference configurations: `examples/reverse-proxy/httpd-option1.conf` and `examp
 | Search results with trace-ID data links            |      |      | ✅    |      |      |      |
 | Variable support                                   |      |      | ✅    |      |      |      |
 | CI workflow + unit tests + Playwright e2e          |      |      | ✅    |      |      |      |
-| `jaegerPublicURL` as single source of truth        |      |      |      | ✅    |      |      |
+| Datasource `url` as single source of truth         |      |      |      | ✅    |      |      |
 | `DataSourcePicker` in panel options                |      |      |      | ✅    |      |      |
 | Datasource frontend-only (no Go binary)            |      |      |      | ✅    |      |      |
 | Reverse proxy e2e: curl/jq + Playwright (both opt) |      |      |      | ✅    |      |      |
@@ -404,4 +404,4 @@ Reference configurations: `examples/reverse-proxy/httpd-option1.conf` and `examp
 - Grafana CallResource CSP: `pkg/plugins/manager/client/client.go:SetCSPHeader` (grafana/grafana)
 - Grafana DataProxy CSP: `pkg/util/proxyutil/reverse_proxy.go:modifyResponse` (grafana/grafana)
 - Grafana App Plugin routes: `pkg/api/api.go` lines 175–176, handler `hs.Index` (grafana/grafana)
-- Grafana DataProxy route configuration: `plugin.json` `routes` array
+- Grafana `plugin.json` schema: https://grafana.com/developers/plugin-tools/reference/plugin-json
