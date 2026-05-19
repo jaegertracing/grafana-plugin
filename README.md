@@ -14,12 +14,12 @@ The plugin renders an iframe pointing at a Jaeger Query service. Three modes are
 
 ## Installation
 
-Download the latest `jaegertracing-jaeger-panel-<version>.zip`, `jaegertracing-jaeger-datasource-<version>.zip`, and `checksums.txt` from the [Releases](https://github.com/jaegertracing/grafana-plugin/releases) page.
-
-Verify the checksums before installing:
+Download `jaegertracing-jaeger-panel-<version>.zip`, `jaegertracing-jaeger-datasource-<version>.zip`, and `checksums.txt` from the [Releases](https://github.com/jaegertracing/grafana-plugin/releases) page into the same directory, then verify:
 
 ```bash
 sha256sum -c checksums.txt
+# jaegertracing-jaeger-panel-<version>.zip: OK
+# jaegertracing-jaeger-datasource-<version>.zip: OK
 ```
 
 Unzip both archives into your Grafana plugins directory, then add to `grafana.ini`:
