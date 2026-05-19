@@ -324,22 +324,26 @@ Option 2:
 
 The Grafana API call path (datasource DataProxy → Jaeger) is validated separately via the existing e2e tests. This script focuses purely on the ingress proxy layer.
 
-**Status: ✅ COMPLETE — 17 curl/jq + 8 Playwright assertions pass**
+**Status: ✅ COMPLETE — validated locally via `make test-reverse-proxy` (Jaeger 2.18.0, Grafana 12.4.0)**
+
+> Tests run locally only; not part of CI. See CONTRIBUTING.md.
 
 The test suite covers two layers:
 
-**Proxy layer** (curl/jq, `examples/reverse-proxy/test.sh`):
+**Proxy layer** (curl/jq, `examples/reverse-proxy/test.sh`): 14 assertions pass:
 - Both options serve `index.html` with the inline base-path detection script (`data-inject-target="BASE_URL"` marker present).
 - `/api/services` returns non-empty data through both proxies.
 - All JS/CSS assets return HTTP 200 through both proxy paths.
+- `jaegerPublicURL` matches the expected proxy address for each datasource.
 
-**Grafana integration layer** (curl/jq + Playwright, `examples/reverse-proxy/test.sh` + `tests/reverse-proxy.spec.ts`):
+**Grafana integration layer** (Playwright, `tests/reverse-proxy.spec.ts`): 6 assertions pass:
 - Grafana's DataProxy reaches Jaeger through each httpd proxy: `GET /api/datasources/proxy/uid/<uid>/api/services` returns data (full chain: browser → Grafana DataProxy → httpd → Jaeger).
-- Datasource health check (`/api/datasources/uid/<uid>/health`) returns `status: OK`.
 - `jaegerPublicURL` is correctly provisioned to the proxy address for each datasource.
-- ConfigEditor shows the correct `jaegerPublicURL` value for each datasource (Playwright).
+- ConfigEditor shows the correct `jaegerPublicURL` value for each datasource.
 
-**Conclusion**: Both proxy approaches are confirmed working end-to-end through Grafana. Since Jaeger 2.18.0, Option 2 (prefix stripping) requires only a standard reverse proxy with no response-body rewriting, making it the simpler choice for deployments that need one Jaeger instance accessible under multiple prefixes.
+Note: `GET /api/datasources/uid/:uid/health` returns "plugin unavailable" for frontend-only plugins (no Go backend process) in Grafana 12.4.0 — this is expected; the DataProxy test covers the equivalent connectivity check.
+
+**Conclusion**: Both proxy approaches confirmed working end-to-end through Grafana 12.4.0 with Jaeger 2.18.0. Since Jaeger 2.18.0, Option 2 (prefix stripping) requires only a standard reverse proxy with no response-body rewriting, making it the simpler choice for deployments that need one Jaeger instance accessible under multiple prefixes.
 
 Reference configurations: `examples/reverse-proxy/httpd-option1.conf` and `examples/reverse-proxy/httpd-option2.conf` in this repo.
 

@@ -4,7 +4,7 @@
  * Runs against the Grafana instance in examples/reverse-proxy/ (port 18082),
  * which has two Jaeger datasources pointing at httpd reverse proxies:
  *   - jaeger-option1: transparent proxy + --query.base-path
- *   - jaeger-option2: prefix stripping + <base href> rewriting
+ *   - jaeger-option2: prefix stripping (base path auto-detected by UI since Jaeger 2.18.0)
  *
  * The Grafana in this stack has anonymous Admin auth enabled, so no login needed.
  * Datasource UIDs are stable (defined in examples/reverse-proxy/provisioning/datasources/datasources.yml).
@@ -39,13 +39,6 @@ for (const ds of DATASOURCES) {
     expect(body.data.length).toBeGreaterThan(0);
   });
 
-  test(`${ds.label}: datasource health check returns OK`, async ({ request }) => {
-    const resp = await request.get(`/api/datasources/uid/${ds.uid}/health`);
-    expect(resp.ok()).toBeTruthy();
-    const body = await resp.json();
-    expect(body.status).toBe('OK');
-  });
-
   test(`${ds.label}: jaegerPublicURL is set to proxy address`, async ({ request }) => {
     const resp = await request.get(`/api/datasources/uid/${ds.uid}`);
     expect(resp.ok()).toBeTruthy();
@@ -58,7 +51,9 @@ for (const ds of DATASOURCES) {
     // shows the proxy address. This confirms the panel would render the iframe
     // pointing at the correct proxy-prefixed URL.
     await page.goto(`/connections/datasources/edit/${ds.uid}`);
-    const urlInput = page.getByLabel('Jaeger UI URL');
+    // Grafana's InlineField renders the label as a div, not a <label for=...>,
+    // so getByLabel doesn't work. Use the placeholder, which we control in ConfigEditor.tsx.
+    const urlInput = page.getByPlaceholder('http://localhost:16686');
     await expect(urlInput).toBeVisible({ timeout: 10000 });
     await expect(urlInput).toHaveValue(ds.expectedPublicURL);
   });

@@ -109,18 +109,6 @@ assert_grafana_dataproxy() {
 
 # Grafana datasource health check endpoint.
 # Returns {"status":"OK"} when CheckHealth/testDatasource passes.
-assert_grafana_health() {
-    local label="$1" uid="$2"
-    local url="$GRAFANA_URL/api/datasources/uid/$uid/health"
-    local status
-    status=$(curl -s "$url" | jq -r '.status' 2>/dev/null || echo "")
-    if [[ "$status" == "OK" ]]; then
-        pass "$label — health check status=OK"
-    else
-        fail "$label — health check status=$status ($url)"
-    fi
-}
-
 # Verify jaegerPublicURL in datasource settings matches the expected proxy URL.
 # This is the URL the panel uses as the iframe src base.
 assert_jaeger_public_url() {
@@ -190,16 +178,14 @@ assert_assets_load   "Option2 assets"               "$OPTION2_URL"
 echo ""
 echo "--- Grafana integration: Option 1 datasource ---"
 
-assert_grafana_dataproxy "Option1 DataProxy"    "jaeger-option1"
-assert_grafana_health    "Option1 health check" "jaeger-option1"
-assert_jaeger_public_url "Option1 public URL"   "jaeger-option1" "http://localhost:18080/jaeger/ui"
+assert_grafana_dataproxy "Option1 DataProxy"  "jaeger-option1"
+assert_jaeger_public_url "Option1 public URL" "jaeger-option1" "http://localhost:18080/jaeger/ui"
 
 echo ""
 echo "--- Grafana integration: Option 2 datasource ---"
 
-assert_grafana_dataproxy "Option2 DataProxy"    "jaeger-option2"
-assert_grafana_health    "Option2 health check" "jaeger-option2"
-assert_jaeger_public_url "Option2 public URL"   "jaeger-option2" "http://localhost:18081/jaeger/ui"
+assert_grafana_dataproxy "Option2 DataProxy"  "jaeger-option2"
+assert_jaeger_public_url "Option2 public URL" "jaeger-option2" "http://localhost:18081/jaeger/ui"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
