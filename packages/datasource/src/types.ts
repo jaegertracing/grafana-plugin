@@ -1,5 +1,4 @@
 import { DataQuery } from '@grafana/schema';
-import { DataSourceJsonData } from '@grafana/data';
 
 export interface JaegerQuery extends DataQuery {
   traceId?: string;
@@ -11,8 +10,6 @@ export interface JaegerQuery extends DataQuery {
   limit?: number;
   queryType?: 'trace' | 'search';
 }
-
-export type JaegerDataSourceOptions = DataSourceJsonData;
 
 export const DEFAULT_QUERY: Partial<JaegerQuery> = {
   queryType: 'search',

@@ -4,18 +4,19 @@ import {
   DataQueryResponse,
   DataSourceApi,
   DataSourceInstanceSettings,
+  DataSourceJsonData,
   FieldType,
   TimeRange,
   createDataFrame,
 } from '@grafana/data';
 import { getBackendSrv, getTemplateSrv, isFetchError } from '@grafana/runtime';
 import { lastValueFrom } from 'rxjs';
-import { JaegerDataSourceOptions, JaegerQuery } from '../types';
+import { JaegerQuery } from '../types';
 
-export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourceOptions> {
+export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonData> {
   readonly baseUrl: string;
 
-  constructor(instanceSettings: DataSourceInstanceSettings<JaegerDataSourceOptions>) {
+  constructor(instanceSettings: DataSourceInstanceSettings<DataSourceJsonData>) {
     super(instanceSettings);
     // instanceSettings.url is the datasource URL configured by the operator — the same
     // browser-accessible Jaeger origin used by the panel iframe.
