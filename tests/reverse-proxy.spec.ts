@@ -9,7 +9,7 @@
  * The Grafana in this stack has anonymous Admin auth enabled, so no login needed.
  * Datasource UIDs are stable (defined in examples/reverse-proxy/provisioning/datasources/datasources.yml).
  *
- * Run via: make test-reverse-proxy-e2e  (starts the stack, runs these tests, tears down)
+ * Run via: make test-reverse-proxy  (starts the stack, runs these tests, tears down)
  */
 
 import { test, expect } from '@playwright/test';
