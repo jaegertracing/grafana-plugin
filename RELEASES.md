@@ -1,6 +1,6 @@
 # Releasing
 
-> This document containts isntructions for maintainers on performing a new release.
+> This document contains instructions for maintainers on performing a new release.
 > Installation instructions for users are in the [README.md](README.md).
 
 1. Go to **[Releases](https://github.com/jaegertracing/grafana-plugin/releases) → Draft a new release**.
