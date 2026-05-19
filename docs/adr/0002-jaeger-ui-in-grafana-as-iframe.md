@@ -188,15 +188,17 @@ The phases are ordered to reduce project risk as early as possible. The first tw
 
 ### Phase 3 — Go backend binary: proxy mode — ✅ COMPLETE then REMOVED (2026-05-09)
 
-**Goal:** Route datasource API calls through the Grafana server to reach Jaeger deployments not directly accessible from the browser. The iframe itself is unaffected — it always loads from `jaegerPublicURL`.
+> **Note:** The Go binary was built and validated, then removed. The content below is retained as historical context explaining what was built and why it was removed. The current datasource is frontend-only; see the Post-completion decision at the end of this section.
 
-**Authentication context:**
+**Goal (historical):** Route datasource API calls through the Grafana server to reach Jaeger deployments not directly accessible from the browser. The iframe itself is unaffected — it always loads from `jaegerPublicURL`.
 
-When Grafana and Jaeger are deployed in the same private network (not individually SSO-protected), all browser-to-Jaeger requests are blocked because Jaeger has no public address. The Go binary solves the API-call side of this: `/api/traces`, `/api/services`, `/api/operations` are forwarded server-side, so the search results table and health check work. The iframe still requires a browser-reachable Jaeger origin for the SPA (see Proxy Mode Limitations below).
+**Authentication context (historical):**
 
-Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, Jaeger forwards the incoming `Authorization` header to the trace storage backend for per-user access control. The Go binary propagates the `Authorization` header from the Grafana request to Jaeger for this purpose. Note: this only covers the datasource API calls (search, services, operations); the iframe always loads from `jaegerPublicURL` directly in the browser and is outside the Go binary's scope entirely.
+When Grafana and Jaeger are deployed in the same private network (not individually SSO-protected), all browser-to-Jaeger requests are blocked because Jaeger has no public address. The Go binary solved the API-call side of this: `/api/traces`, `/api/services`, `/api/operations` were forwarded server-side, so the search results table and health check worked. The iframe still required a browser-reachable Jaeger origin for the SPA (see Proxy Mode Limitations below).
 
-**What was built:**
+Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, Jaeger forwards the incoming `Authorization` header to the trace storage backend for per-user access control. The Go binary propagated the `Authorization` header from the Grafana request to Jaeger for this purpose. Note: this only covered the datasource API calls (search, services, operations); the iframe always loads from `jaegerPublicURL` directly in the browser and is outside the Go binary's scope entirely.
+
+**What was built (historical):**
 
 - `packages/datasource/pkg/main.go`: entry point using `datasource.Manage` from `grafana-plugin-sdk-go`.
 - `packages/datasource/pkg/plugin.go`: `JaegerDatasource` struct; `CheckHealth` (verifies `/api/services` reachability); `CallResource` (routes all requests through the proxy when proxy mode is on).
@@ -204,15 +206,15 @@ Additionally, Jaeger supports `--query.bearer-token-propagation`: when enabled, 
 - `packages/datasource/Magefile.go` + `go.mod` (`tool github.com/magefile/mage`): Go binary built via `go tool mage build:linuxARM64 build:linux` without requiring a globally installed `mage`.
 - `packages/datasource/src/components/ConfigEditor.tsx`: "Proxy mode" toggle, "Jaeger UI URL" field (direct mode), and "Jaeger internal URL" field (proxy mode).
 - `packages/datasource/src/types.ts`: `jaegerPublicURL` (browser-accessible Jaeger URL, used by the panel iframe in both modes); `jaegerInternalURL` (server-accessible URL, used by Go proxy in proxy mode).
-- `packages/datasource/src/datasource/datasource.ts`: routes all API calls through `/api/datasources/uid/<uid>/resources/...` when `proxyMode=true`, so service discovery, trace search, and health check all flow through the Go proxy.
+- `packages/datasource/src/datasource/datasource.ts`: routed all API calls through `/api/datasources/uid/<uid>/resources/...` when `proxyMode=true`, so service discovery, trace search, and health check all flowed through the Go proxy.
 - `packages/panel/src/components/JaegerPanel.tsx`: reads `jaegerPublicURL` from the datasource's `jsonData` via `getDataSourceSrv().getInstanceSettings(uid)`, using it as the iframe base in all modes. `datasourceUid` panel option added; `DataSourcePicker` custom editor replaces the old text-field `jaegerBaseUrl`.
 - Provisioned `Jaeger (proxied)` datasource (`uid: jaeger-proxied`) for testing alongside the direct-mode datasource; provisioned `Jaeger Traces (proxied)` dashboard.
 
-**Validated (2026-05-08):**
+**Validated (2026-05-08, historical):**
 - Health check: "Connected to Jaeger at http://jaeger:16686" when proxy mode is enabled with a reachable Jaeger.
 - Search results table populates via `/api/datasources/uid/jaeger-proxied/resources/api/traces?...` (visible in DevTools Network tab).
-- Search panel populates correctly through the proxy. The trace detail panel also renders because `jaegerPublicURL` points to a locally accessible Jaeger — not because of proxy mode. In a deployment where Jaeger is internal-only, the trace panel iframe would still fail.
-- Bearer token forwarding: code is in place (`Authorization` header is propagated to Jaeger API calls) but **not tested** end-to-end. Scope is limited to datasource API calls only; the iframe is unaffected.
+- Search panel populates correctly through the proxy. The trace detail panel also rendered because `jaegerPublicURL` pointed to a locally accessible Jaeger — not because of proxy mode. In a deployment where Jaeger is internal-only, the trace panel iframe would still fail.
+- Bearer token forwarding: code was in place (`Authorization` header propagated to Jaeger API calls) but **not tested** end-to-end. Scope was limited to datasource API calls only; the iframe is unaffected.
 
 **Proxy Mode Limitations: CSP Sandbox**
 
