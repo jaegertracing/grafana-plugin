@@ -58,7 +58,7 @@ for (const ds of DATASOURCES) {
     // shows the proxy address. This confirms the panel would render the iframe
     // pointing at the correct proxy-prefixed URL.
     await page.goto(`/connections/datasources/edit/${ds.uid}`);
-    const urlInput = page.getByPlaceholder('http://localhost:16686');
+    const urlInput = page.getByLabel('Jaeger UI URL');
     await expect(urlInput).toBeVisible({ timeout: 10000 });
     await expect(urlInput).toHaveValue(ds.expectedPublicURL);
   });
