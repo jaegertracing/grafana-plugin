@@ -70,8 +70,8 @@ make test-reverse-proxy
 
 This target:
 1. Starts `examples/reverse-proxy/docker-compose.yaml` in detached mode.
-2. Runs `examples/reverse-proxy/test.sh` — 14 curl/jq assertions covering the proxy layer (HTTP responses, `data-inject-target="BASE_URL"` presence) and Grafana integration (DataProxy `/api/services`, `jaegerPublicURL` field).
-3. Runs Playwright tests (`tests/reverse-proxy.spec.ts`) against Grafana at port 18082 — 6 assertions covering DataProxy, `jaegerPublicURL`, and the datasource ConfigEditor field value.
+2. Runs `examples/reverse-proxy/test.sh` — 12 curl/jq assertions covering the proxy layer (HTTP responses, `data-inject-target="BASE_URL"` presence, `/api/services`, assets) and Grafana datasource provisioning (`jaegerPublicURL` field).
+3. Runs Playwright tests (`tests/reverse-proxy.spec.ts`) against the stack — 6 assertions covering `/api/services` reachability via public URL, `jaegerPublicURL` provisioning, and the datasource ConfigEditor field value.
 4. Tears down the stack regardless of test outcome.
 
 The two proxy strategies tested:

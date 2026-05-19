@@ -31,8 +31,8 @@ const DATASOURCES = [
 ];
 
 for (const ds of DATASOURCES) {
-  test(`${ds.label}: DataProxy /api/services returns data`, async ({ request }) => {
-    const resp = await request.get(`/api/datasources/proxy/uid/${ds.uid}/api/services`);
+  test(`${ds.label}: /api/services returns data via public URL`, async ({ request }) => {
+    const resp = await request.get(`${ds.expectedPublicURL}/api/services`);
     await expect(resp).toBeOK();
     const body = await resp.json();
     expect(Array.isArray(body.data)).toBe(true);

@@ -13,16 +13,14 @@ import { lastValueFrom } from 'rxjs';
 import { JaegerDataSourceOptions, JaegerQuery } from '../types';
 
 export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourceOptions> {
-  readonly proxyUrl: string;
+  readonly baseUrl: string;
 
   constructor(instanceSettings: DataSourceInstanceSettings<JaegerDataSourceOptions>) {
     super(instanceSettings);
-    // API calls go through Grafana's built-in DataProxy (the "routes" entry in plugin.json).
-    // When access=proxy (server), instanceSettings.url is /api/datasources/proxy/uid/<uid>
-    // and Grafana forwards requests server-side to <datasource url>/api/*.
-    // When access=direct (browser), instanceSettings.url is the raw datasource URL and
-    // requests go directly from the browser — use only in trusted network environments.
-    this.proxyUrl = instanceSettings.url!;
+    // jaegerPublicURL is the browser-accessible Jaeger origin — the same URL used by the
+    // panel iframe. Since the iframe requires the browser to reach Jaeger directly, all
+    // API calls (services, traces) can use the same URL from the browser too.
+    this.baseUrl = instanceSettings.jsonData.jaegerPublicURL ?? '';
   }
 
   async query(request: DataQueryRequest<JaegerQuery>): Promise<DataQueryResponse> {
@@ -102,7 +100,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
     const response = await lastValueFrom(
       getBackendSrv().fetch<{ data: JaegerTrace[] }>({
-        url: `${this.proxyUrl}/api/traces?${params}`,
+        url: `${this.baseUrl}/api/traces?${params}`,
       })
     );
 
@@ -148,7 +146,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     try {
       await lastValueFrom(
         getBackendSrv().fetch({
-          url: `${this.proxyUrl}/api/services`,
+          url: `${this.baseUrl}/api/services`,
         })
       );
       return { status: 'success', message: 'Successfully connected to Jaeger' };
@@ -161,7 +159,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
   async getServices(): Promise<string[]> {
     const response = await lastValueFrom(
       getBackendSrv().fetch<{ data: string[] }>({
-        url: `${this.proxyUrl}/api/services`,
+        url: `${this.baseUrl}/api/services`,
       })
     );
     return response.data.data ?? [];
@@ -170,7 +168,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
   async getOperations(service: string): Promise<string[]> {
     const response = await lastValueFrom(
       getBackendSrv().fetch<{ data: string[] }>({
-        url: `${this.proxyUrl}/api/services/${encodeURIComponent(service)}/operations`,
+        url: `${this.baseUrl}/api/services/${encodeURIComponent(service)}/operations`,
       })
     );
     return response.data.data ?? [];

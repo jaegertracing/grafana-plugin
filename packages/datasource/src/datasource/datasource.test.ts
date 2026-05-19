@@ -12,15 +12,15 @@ jest.mock('@grafana/runtime', () => ({
 const mockGetBackendSrv = getBackendSrv as jest.Mock;
 const mockGetTemplateSrv = getTemplateSrv as jest.Mock;
 
-function makeInstance(url = '/api/datasources/proxy/uid/test-uid') {
+function makeInstance(jaegerPublicURL = 'http://localhost:16686') {
   return new JaegerDataSource({
     uid: 'test-uid',
     id: 1,
     name: 'Jaeger',
     type: 'jaegertracing-jaeger-datasource',
-    url,
+    url: '',
     access: 'proxy',
-    jsonData: { jaegerPublicURL: 'http://localhost:16686' },
+    jsonData: { jaegerPublicURL },
     readOnly: false,
   } as any);
 }
@@ -30,9 +30,9 @@ beforeEach(() => {
 });
 
 describe('JaegerDataSource — constructor', () => {
-  it('uses instanceSettings.url as proxyUrl', () => {
-    const ds = makeInstance('http://grafana/proxy');
-    expect(ds.proxyUrl).toBe('http://grafana/proxy');
+  it('uses jaegerPublicURL as baseUrl', () => {
+    const ds = makeInstance('http://jaeger.example.com/jaeger');
+    expect(ds.baseUrl).toBe('http://jaeger.example.com/jaeger');
   });
 });
 
@@ -126,7 +126,7 @@ describe('JaegerDataSource — query (search mode)', () => {
     );
     mockGetBackendSrv.mockReturnValue({ fetch });
 
-    const ds = makeInstance('/proxy');
+    const ds = makeInstance('http://jaeger.example.com/jaeger');
     const from = { valueOf: () => 1000 };
     const to = { valueOf: () => 2000 };
     const result = await ds.query({
@@ -135,7 +135,7 @@ describe('JaegerDataSource — query (search mode)', () => {
     } as any);
 
     const [callArg] = fetch.mock.calls[0];
-    expect(callArg.url).toContain('/proxy/api/traces');
+    expect(callArg.url).toContain('jaeger.example.com/jaeger/api/traces');
     expect(callArg.url).toContain('service=frontend');
     expect(callArg.url).toContain('limit=5');
 
@@ -163,7 +163,7 @@ describe('JaegerDataSource — query (search mode)', () => {
     const fetch = jest.fn().mockReturnValue(of({ data: { data: [] } }));
     mockGetBackendSrv.mockReturnValue({ fetch });
 
-    const ds = makeInstance('/proxy');
+    const ds = makeInstance('http://localhost:16686');
     await ds.query({
       targets: [{ refId: 'A', queryType: 'search', service: '${svc}' }],
       range: { from: { valueOf: () => 0 }, to: { valueOf: () => 0 } } as any,

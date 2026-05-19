@@ -63,17 +63,13 @@ grafana-plugin/
 
 Grafana plugins can be frontend-only (`"backend": false`) or full-stack (`"backend": true`, Go binary). We evaluated the binary and found it entirely redundant:
 
-### API call proxying — handled by DataProxy without a binary
+### API call proxying — not needed; browser reaches Jaeger directly
 
-The datasource `plugin.json` defines a built-in DataProxy route:
+The panel plugin renders a `<iframe src={jaegerPublicURL}>`. Since the Jaeger SPA must run in the browser (Grafana's proxy infrastructure unconditionally adds `Content-Security-Policy: sandbox` — see Phase 3 below), the browser **must** already have a direct network path to `jaegerPublicURL`. If the browser can load the SPA it can also call `/api/services`, `/api/traces`, etc. at the same origin.
 
-```json
-"routes": [{"path": "api", "url": "{{ .URL }}/api"}]
-```
+The datasource TypeScript therefore calls Jaeger's API directly using `jaegerPublicURL` as the base URL — no intermediary proxy of any kind. This eliminates a round-trip through the Grafana server for every search and service-discovery request.
 
-This instructs Grafana's **built-in DataProxy** to forward requests from the browser at `/api/datasources/proxy/uid/<uid>/api/*` → `<datasource url>/api/*` entirely server-side, without any Go binary. The TypeScript datasource uses `instanceSettings.url` which resolves to this DataProxy path automatically. The `url` field in the datasource config editor points at whatever Jaeger origin the operator configures (e.g. `http://jaeger:16686` internally, or `http://httpd-proxy/jaeger` for the reverse-proxy pattern) — Grafana proxies all API calls server-side.
-
-The DataProxy also supports `jsonData.oauthPassThru` for forwarding OAuth tokens upstream and standard header forwarding — without any custom code.
+**CORS consideration:** Direct browser-to-Jaeger API calls require either same-origin access or Jaeger to emit appropriate CORS headers. In the recommended ingress deployment (Jaeger served under a path prefix on the same origin as Grafana) there is no cross-origin request at all — both the iframe and the API calls go to `grafana.mydomain.com/jaeger/...`. In a split-origin deployment (`grafana.mydomain.com` + `jaeger.mydomain.com`) CORS headers on Jaeger would be needed for the API calls, but the iframe would also fail due to third-party cookie blocking in that scenario (see SSO section below), making a same-origin ingress the correct solution for both problems simultaneously.
 
 ### Health check — handled by TypeScript
 
@@ -89,7 +85,7 @@ The user-facing **"Test" button** calls the TypeScript `testDatasource()` method
 
 ### Result
 
-The datasource config editor now has a single field: **Jaeger UI URL** (`jaegerPublicURL`). This is the browser-accessible Jaeger origin used by the panel iframe. The DataProxy `url` field (set via `provisioning/datasources/datasources.yml` or the Grafana admin UI) controls where API calls are proxied server-side — these are two separate concerns served by two separate fields.
+The datasource config editor has a single field: **Jaeger UI URL** (`jaegerPublicURL`). This is the browser-accessible Jaeger origin used by both the panel iframe and all datasource API calls (`/api/services`, `/api/traces`, etc.). There is no server-side proxy path and no separate internal-URL field.
 
 ---
 
@@ -173,7 +169,7 @@ The phases are ordered to reduce project risk as early as possible. The first tw
 - Provisioned datasource with stable `uid: jaeger` for reliable dashboard references.
 
 **Validated (2026-05-07):**
-- Service discovery and trace search flow through the Grafana backend proxy; no browser-to-Jaeger API traffic.
+- Service discovery and trace search call Jaeger's API directly from the browser via `jaegerPublicURL`.
 - Search results table shows `traceName`, `spanCount`, `duration`, with two context-menu links per row: "Open in dashboard" (sets `$traceId` variable, stays on page) and "Open in Explore" (`splitOpen()`, second pane renders trace iframe).
 - `preferredVisualisationPluginId` routes trace-ID lookup results to the Jaeger panel automatically in Explore.
 - Iframe base URL is read from the datasource's `jaegerPublicURL` field; if unset, the panel shows a "Select a Jaeger datasource" hint. Production deployments must configure `jaegerPublicURL` in the datasource settings.
@@ -330,14 +326,14 @@ The Grafana API call path (datasource DataProxy → Jaeger) is validated separat
 
 The test suite covers two layers:
 
-**Proxy layer** (curl/jq, `examples/reverse-proxy/test.sh`): 14 assertions pass:
+**Proxy layer** (curl/jq, `examples/reverse-proxy/test.sh`): 12 assertions pass:
 - Both options serve `index.html` with the inline base-path detection script (`data-inject-target="BASE_URL"` marker present).
 - `/api/services` returns non-empty data through both proxies.
 - All JS/CSS assets return HTTP 200 through both proxy paths.
-- `jaegerPublicURL` matches the expected proxy address for each datasource.
+- `jaegerPublicURL` is correctly provisioned for each datasource.
 
 **Grafana integration layer** (Playwright, `tests/reverse-proxy.spec.ts`): 6 assertions pass:
-- Grafana's DataProxy reaches Jaeger through each httpd proxy: `GET /api/datasources/proxy/uid/<uid>/api/services` returns data (full chain: browser → Grafana DataProxy → httpd → Jaeger).
+- `/api/services` returns data via `jaegerPublicURL` directly from the browser (browser → httpd → Jaeger).
 - `jaegerPublicURL` is correctly provisioned to the proxy address for each datasource.
 - ConfigEditor shows the correct `jaegerPublicURL` value for each datasource.
 

@@ -91,26 +91,8 @@ assert_assets_load() {
     fi
 }
 
-# Grafana DataProxy: GET /api/datasources/proxy/uid/<uid>/api/services
-# Grafana proxies this to the datasource URL + /api/services.
-# The datasource URL points at httpd (the reverse proxy), so this exercises
-# the full chain: test → Grafana DataProxy → httpd → Jaeger.
-assert_grafana_dataproxy() {
-    local label="$1" uid="$2"
-    local url="$GRAFANA_URL/api/datasources/proxy/uid/$uid/api/services"
-    local result
-    result=$(curl -s "$url" | jq -r '.data | length' 2>/dev/null || echo "")
-    if [[ -n "$result" && "$result" != "null" && "$result" != "0" ]]; then
-        pass "$label — DataProxy /api/services returned $result services"
-    else
-        fail "$label — DataProxy /api/services empty/null ($url)"
-    fi
-}
-
-# Grafana datasource health check endpoint.
-# Returns {"status":"OK"} when CheckHealth/testDatasource passes.
 # Verify jaegerPublicURL in datasource settings matches the expected proxy URL.
-# This is the URL the panel uses as the iframe src base.
+# This is the URL the panel uses as the iframe src base and for all API calls.
 assert_jaeger_public_url() {
     local label="$1" uid="$2" expected="$3"
     local url="$GRAFANA_URL/api/datasources/uid/$uid"
@@ -176,15 +158,9 @@ assert_json_field    "Option2 services non-empty"   "$OPTION2_URL/api/services" 
 assert_assets_load   "Option2 assets"               "$OPTION2_URL"
 
 echo ""
-echo "--- Grafana integration: Option 1 datasource ---"
+echo "--- Grafana integration: datasource provisioning ---"
 
-assert_grafana_dataproxy "Option1 DataProxy"  "jaeger-option1"
 assert_jaeger_public_url "Option1 public URL" "jaeger-option1" "http://localhost:18080/jaeger/ui"
-
-echo ""
-echo "--- Grafana integration: Option 2 datasource ---"
-
-assert_grafana_dataproxy "Option2 DataProxy"  "jaeger-option2"
 assert_jaeger_public_url "Option2 public URL" "jaeger-option2" "http://localhost:18081/jaeger/ui"
 
 echo ""
