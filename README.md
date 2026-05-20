@@ -44,6 +44,17 @@ Install the **Jaeger datasource** plugin and add a datasource for each Jaeger in
 2. Set **URL** to the browser-accessible address of Jaeger (e.g. `http://localhost:16686`). This is used both as the iframe source and for all API calls (health checks, fetching services/traces). In a reverse-proxy deployment this is the proxy address including any path prefix.
 3. Set **Access** to **Browser**. The default "Server (default)" mode routes all API calls through Grafana's backend proxy, which rewrites the URL and prevents the plugin from reaching Jaeger directly from the browser.
 
+### CORS requirement
+
+Because the plugin calls the Jaeger API directly from the browser, Jaeger must allow cross-origin requests from the Grafana origin. In Jaeger 2.x this is configured via the `extensions.jaeger_query.http.cors.allowed_origins` setting:
+
+```bash
+# via --set flag (no config file needed)
+jaeger --set="extensions.jaeger_query.http.cors.allowed_origins=[https://grafana.example.com]"
+```
+
+In a reverse-proxy deployment, CORS headers are typically added by the proxy (nginx, Traefik, etc.) in front of Jaeger rather than on Jaeger itself, since the proxy already handles the routing and can scope the header to the exact Grafana origin.
+
 ## Panel options
 
 | Option | Description |
