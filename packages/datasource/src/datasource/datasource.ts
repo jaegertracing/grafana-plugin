@@ -9,8 +9,7 @@ import {
   TimeRange,
   createDataFrame,
 } from '@grafana/data';
-import { getBackendSrv, getTemplateSrv, isFetchError } from '@grafana/runtime';
-import { lastValueFrom } from 'rxjs';
+import { getTemplateSrv } from '@grafana/runtime';
 import { JaegerQuery } from '../types';
 
 export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonData> {
@@ -96,11 +95,11 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonD
       processes: Record<string, { serviceName: string }>;
     }
 
-    const response = await lastValueFrom(
-      getBackendSrv().fetch<{ data: JaegerTrace[] }>({
-        url: `${this.baseUrl}/api/traces?${params}`,
-      })
-    );
+    const response = await fetch(`${this.baseUrl}/api/traces?${params}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const responseData: { data: JaegerTrace[] } = await response.json();
 
     const traceLink: DataLink = {
       title: 'Open in Explore',
@@ -117,7 +116,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonD
     const spanCounts: number[] = [];
     const durations: number[] = [];
 
-    for (const trace of response.data.data ?? []) {
+    for (const trace of responseData.data ?? []) {
       const spans: JaegerSpan[] = Array.isArray(trace.spans) ? trace.spans : [];
       // Root span: the one with no parent reference
       const rootSpan = spans.find((s) => !s.references?.some((r) => r.refType === 'CHILD_OF'))
@@ -143,33 +142,31 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, DataSourceJsonD
 
   async testDatasource(): Promise<{ status: string; message: string }> {
     try {
-      await lastValueFrom(
-        getBackendSrv().fetch({
-          url: `${this.baseUrl}/api/services`,
-        })
-      );
+      const response = await fetch(`${this.baseUrl}/api/services`);
+      if (!response.ok) {
+        return { status: 'error', message: `Cannot connect to Jaeger: HTTP ${response.status}: ${response.statusText}` };
+      }
       return { status: 'success', message: 'Successfully connected to Jaeger' };
     } catch (err) {
-      const msg = isFetchError(err) ? `HTTP ${err.status}: ${err.statusText}` : String(err);
-      return { status: 'error', message: `Cannot connect to Jaeger: ${msg}` };
+      return { status: 'error', message: `Cannot connect to Jaeger: ${String(err)}` };
     }
   }
 
   async getServices(): Promise<string[]> {
-    const response = await lastValueFrom(
-      getBackendSrv().fetch<{ data: string[] }>({
-        url: `${this.baseUrl}/api/services`,
-      })
-    );
-    return response.data.data ?? [];
+    const response = await fetch(`${this.baseUrl}/api/services`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const data: { data: string[] } = await response.json();
+    return data.data ?? [];
   }
 
   async getOperations(service: string): Promise<string[]> {
-    const response = await lastValueFrom(
-      getBackendSrv().fetch<{ data: string[] }>({
-        url: `${this.baseUrl}/api/services/${encodeURIComponent(service)}/operations`,
-      })
-    );
-    return response.data.data ?? [];
+    const response = await fetch(`${this.baseUrl}/api/services/${encodeURIComponent(service)}/operations`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const data: { data: string[] } = await response.json();
+    return data.data ?? [];
   }
 }
