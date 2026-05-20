@@ -26,7 +26,7 @@
     "@types/jest": "30.0.0",
     "@types/node": "25.8.0",
     "@types/react": "18.3.29",
-    "@types/react-dom": "18.3.7",
+    "@types/react-dom": "19.2.3",
     "@typescript-eslint/eslint-plugin": "8.59.4",
     "@typescript-eslint/parser": "8.59.4",
     "copy-webpack-plugin": "14.0.0",
@@ -71,7 +71,7 @@
     "@grafana/schema": "13.0.1",
     "@grafana/ui": "13.0.1",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0",
+    "react-dom": "^19.2.6",
     "rxjs": "^7.8.0"
   },
   "packageManager": "npm@11.14.1"
