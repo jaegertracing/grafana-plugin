@@ -1,7 +1,7 @@
 import React from 'react';
 import { DataSourcePluginOptionsEditorProps } from '@grafana/data';
 import { Alert, InlineField, InlineFieldRow, Input } from '@grafana/ui';
-import { ConnectionSettings } from '@grafana/plugin-ui';
+import { AdvancedHttpSettings, ConnectionSettings } from '@grafana/plugin-ui';
 import { JaegerDataSourceOptions } from '../types';
 
 type Props = DataSourcePluginOptionsEditorProps<JaegerDataSourceOptions>;
@@ -41,6 +41,7 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
         onChange={onOptionsChange}
         urlPlaceholder="http://jaeger:16686"
       />
+      <AdvancedHttpSettings config={options} onChange={onOptionsChange} />
     </>
   );
 }
