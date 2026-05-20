@@ -1,16 +1,21 @@
 import { FieldType } from '@grafana/data';
-import { getBackendSrv, getTemplateSrv } from '@grafana/runtime';
-import { of, throwError } from 'rxjs';
+import { getTemplateSrv } from '@grafana/runtime';
 import { JaegerDataSource } from './datasource';
 
 jest.mock('@grafana/runtime', () => ({
-  getBackendSrv: jest.fn(),
   getTemplateSrv: jest.fn(),
-  isFetchError: jest.fn((e: unknown) => (e as any)?.__isFetchError === true),
 }));
 
-const mockGetBackendSrv = getBackendSrv as jest.Mock;
 const mockGetTemplateSrv = getTemplateSrv as jest.Mock;
+
+function makeFetchResponse(body: unknown, ok = true, status = 200): Response {
+  return {
+    ok,
+    status,
+    statusText: ok ? 'OK' : 'Error',
+    json: () => Promise.resolve(body),
+  } as unknown as Response;
+}
 
 function makeInstance(url = 'http://localhost:16686') {
   return new JaegerDataSource({
@@ -27,6 +32,7 @@ function makeInstance(url = 'http://localhost:16686') {
 
 beforeEach(() => {
   mockGetTemplateSrv.mockReturnValue({ replace: (s: string) => s });
+  globalThis.fetch = jest.fn() as typeof fetch;
 });
 
 describe('JaegerDataSource — constructor', () => {
@@ -38,9 +44,7 @@ describe('JaegerDataSource — constructor', () => {
 
 describe('JaegerDataSource — testDatasource', () => {
   it('returns success when /api/services responds', async () => {
-    mockGetBackendSrv.mockReturnValue({
-      fetch: jest.fn().mockReturnValue(of({ data: { data: ['frontend'] } })),
-    });
+    (globalThis.fetch as jest.Mock).mockResolvedValue(makeFetchResponse({ data: ['frontend'] }));
     const ds = makeInstance();
     const result = await ds.testDatasource();
     expect(result.status).toBe('success');
@@ -48,9 +52,7 @@ describe('JaegerDataSource — testDatasource', () => {
   });
 
   it('returns error when fetch throws', async () => {
-    mockGetBackendSrv.mockReturnValue({
-      fetch: jest.fn().mockReturnValue(throwError(() => new Error('ECONNREFUSED'))),
-    });
+    (globalThis.fetch as jest.Mock).mockRejectedValue(new Error('ECONNREFUSED'));
     const ds = makeInstance();
     const result = await ds.testDatasource();
     expect(result.status).toBe('error');
@@ -60,9 +62,7 @@ describe('JaegerDataSource — testDatasource', () => {
 
 describe('JaegerDataSource — getServices', () => {
   it('returns service list from API', async () => {
-    mockGetBackendSrv.mockReturnValue({
-      fetch: jest.fn().mockReturnValue(of({ data: { data: ['frontend', 'driver'] } })),
-    });
+    (globalThis.fetch as jest.Mock).mockResolvedValue(makeFetchResponse({ data: ['frontend', 'driver'] }));
     const ds = makeInstance();
     const services = await ds.getServices();
     expect(services).toEqual(['frontend', 'driver']);
@@ -71,15 +71,13 @@ describe('JaegerDataSource — getServices', () => {
 
 describe('JaegerDataSource — query (trace mode)', () => {
   it('returns single-row traceID frame without making an API call', async () => {
-    const fetch = jest.fn();
-    mockGetBackendSrv.mockReturnValue({ fetch });
     const ds = makeInstance();
     const result = await ds.query({
       targets: [{ refId: 'A', queryType: 'trace', traceId: 'abc123' }],
       range: { from: { valueOf: () => 0 }, to: { valueOf: () => 0 } } as any,
     } as any);
 
-    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(result.data).toHaveLength(1);
     const frame = result.data[0];
     expect(frame.name).toBe('abc123');
@@ -90,7 +88,6 @@ describe('JaegerDataSource — query (trace mode)', () => {
   });
 
   it('returns empty data when traceId is blank', async () => {
-    mockGetBackendSrv.mockReturnValue({ fetch: jest.fn() });
     const ds = makeInstance();
     const result = await ds.query({
       targets: [{ refId: 'A', queryType: 'trace', traceId: '' }],
@@ -102,29 +99,24 @@ describe('JaegerDataSource — query (trace mode)', () => {
 
 describe('JaegerDataSource — query (search mode)', () => {
   it('calls /api/traces with correct params and returns a traces frame', async () => {
-    const fetch = jest.fn().mockReturnValue(
-      of({
-        data: {
-          data: [
+    (globalThis.fetch as jest.Mock).mockResolvedValue(makeFetchResponse({
+      data: [
+        {
+          traceID: 'trace1',
+          spans: [
             {
-              traceID: 'trace1',
-              spans: [
-                {
-                  spanID: 's1',
-                  operationName: 'HTTP GET /dispatch',
-                  duration: 5000,
-                  startTime: 1000,
-                  processID: 'p1',
-                  references: [],
-                },
-              ],
-              processes: { p1: { serviceName: 'frontend' } },
+              spanID: 's1',
+              operationName: 'HTTP GET /dispatch',
+              duration: 5000,
+              startTime: 1000,
+              processID: 'p1',
+              references: [],
             },
           ],
+          processes: { p1: { serviceName: 'frontend' } },
         },
-      })
-    );
-    mockGetBackendSrv.mockReturnValue({ fetch });
+      ],
+    }));
 
     const ds = makeInstance('http://jaeger.example.com/jaeger');
     const from = { valueOf: () => 1000 };
@@ -134,10 +126,10 @@ describe('JaegerDataSource — query (search mode)', () => {
       range: { from, to } as any,
     } as any);
 
-    const [callArg] = fetch.mock.calls[0];
-    expect(callArg.url).toContain('jaeger.example.com/jaeger/api/traces');
-    expect(callArg.url).toContain('service=frontend');
-    expect(callArg.url).toContain('limit=5');
+    const calledUrl = (globalThis.fetch as jest.Mock).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('jaeger.example.com/jaeger/api/traces');
+    expect(calledUrl).toContain('service=frontend');
+    expect(calledUrl).toContain('limit=5');
 
     expect(result.data).toHaveLength(1);
     const frame = result.data[0];
@@ -149,7 +141,6 @@ describe('JaegerDataSource — query (search mode)', () => {
   });
 
   it('returns empty data when no service is provided', async () => {
-    mockGetBackendSrv.mockReturnValue({ fetch: jest.fn() });
     const ds = makeInstance();
     const result = await ds.query({
       targets: [{ refId: 'A', queryType: 'search', service: '' }],
@@ -160,8 +151,7 @@ describe('JaegerDataSource — query (search mode)', () => {
 
   it('applies template variable interpolation', async () => {
     mockGetTemplateSrv.mockReturnValue({ replace: (s: string) => s.replace('${svc}', 'driver') });
-    const fetch = jest.fn().mockReturnValue(of({ data: { data: [] } }));
-    mockGetBackendSrv.mockReturnValue({ fetch });
+    (globalThis.fetch as jest.Mock).mockResolvedValue(makeFetchResponse({ data: [] }));
 
     const ds = makeInstance('http://localhost:16686');
     await ds.query({
@@ -169,19 +159,17 @@ describe('JaegerDataSource — query (search mode)', () => {
       range: { from: { valueOf: () => 0 }, to: { valueOf: () => 0 } } as any,
     } as any);
 
-    const [callArg] = fetch.mock.calls[0];
-    expect(callArg.url).toContain('service=driver');
+    const calledUrl = (globalThis.fetch as jest.Mock).mock.calls[0][0] as string;
+    expect(calledUrl).toContain('service=driver');
   });
 
   it('skips hidden targets', async () => {
-    const fetch = jest.fn();
-    mockGetBackendSrv.mockReturnValue({ fetch });
     const ds = makeInstance();
     const result = await ds.query({
       targets: [{ refId: 'A', queryType: 'search', service: 'frontend', hide: true }],
       range: { from: { valueOf: () => 0 }, to: { valueOf: () => 0 } } as any,
     } as any);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(result.data).toHaveLength(0);
   });
 });
