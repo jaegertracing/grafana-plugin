@@ -31,7 +31,8 @@ function resolveBaseFromDatasource(uid: string | undefined): string | null {
   }
   // Prefer jsonData.publicUrl (the browser-accessible URL when using proxy access mode).
   // Fall back to settings.url for datasources configured with direct access mode.
-  const rawUrl = ((settings.jsonData as { publicUrl?: string }).publicUrl || settings.url || '').trim().replace(/\/$/, '');
+  const jsonData = (settings.jsonData ?? {}) as { publicUrl?: string };
+  const rawUrl = (jsonData.publicUrl || settings.url || '').trim().replace(/\/$/, '');
   try {
     const parsed = new URL(rawUrl);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {

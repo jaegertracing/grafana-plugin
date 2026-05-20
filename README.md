@@ -41,8 +41,9 @@ Restart Grafana.
 Install the **Jaeger datasource** plugin and add a datasource for each Jaeger instance:
 
 1. Go to **Connections → Data sources → Add new data source** and choose **Jaeger**.
-2. Set **URL** to the address of Jaeger reachable from the **Grafana server** (e.g. `http://jaeger:16686` in Docker, or `http://localhost:16686` for a local setup). Grafana's backend proxy uses this URL for API calls — no CORS configuration required.
-3. Set **Public URL** to the address of Jaeger reachable from the **browser** (e.g. `http://localhost:16686`). The panel uses this as the iframe `src` to render Jaeger UI.
+2. Leave **Access** as **Server (default)**. Grafana's backend proxy forwards API calls server-side — no CORS configuration required on Jaeger.
+3. Set **URL** to the address of Jaeger reachable from the **Grafana server** (e.g. `http://jaeger:16686` in Docker, or `http://localhost:16686` for a local setup).
+4. Set **Public URL** to the address of Jaeger reachable from the **browser** (e.g. `http://localhost:16686`). The panel uses this as the iframe `src` to render Jaeger UI.
 
 ## Panel options
 
