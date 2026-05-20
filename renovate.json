@@ -54,6 +54,12 @@
       "enabled": false
     },
     {
+      "matchPackageNames": ["react", "react-dom", "@types/react", "@types/react-dom"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false,
+      "description": "React major upgrades are blocked: Grafana injects React as an external so plugins always run on Grafana's React version."
+    },
+    {
       "groupName": "All Jaeger Docker images",
       "matchDatasources": [
         "docker"
