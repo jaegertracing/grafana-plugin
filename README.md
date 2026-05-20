@@ -42,6 +42,7 @@ Install the **Jaeger datasource** plugin and add a datasource for each Jaeger in
 
 1. Go to **Connections → Data sources → Add new data source** and choose **Jaeger**.
 2. Set **URL** to the browser-accessible address of Jaeger (e.g. `http://localhost:16686`). This is used both as the iframe source and for all API calls (health checks, fetching services/traces). In a reverse-proxy deployment this is the proxy address including any path prefix.
+3. Set **Access** to **Browser**. The default "Server (default)" mode routes all API calls through Grafana's backend proxy, which rewrites the URL and prevents the plugin from reaching Jaeger directly from the browser.
 
 ## Panel options
 
