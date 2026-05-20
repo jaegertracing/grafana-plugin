@@ -5,6 +5,7 @@ datasources:
   - name: Jaeger-Option1
     uid: jaeger-option1
     type: jaegertracing-jaeger-datasource
+    access: direct
     url: http://localhost:18080/jaeger/ui
     isDefault: true
 
@@ -12,4 +13,5 @@ datasources:
   - name: Jaeger-Option2
     uid: jaeger-option2
     type: jaegertracing-jaeger-datasource
+    access: direct
     url: http://localhost:18081/jaeger/ui

@@ -5,4 +5,5 @@ datasources:
     uid: jaeger
     type: jaegertracing-jaeger-datasource
     url: http://localhost:16686
+    access: direct
     isDefault: true
