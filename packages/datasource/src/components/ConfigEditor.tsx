@@ -20,22 +20,24 @@ export function ConfigEditor({ options, onOptionsChange }: Props) {
           proxy. Can be an internal address not reachable from the browser (e.g.{' '}
           <code>http://jaeger:16686</code> in Docker).
         </p>
-        <InlineFieldRow>
-          <InlineField label="Public URL" labelWidth={20}>
-            <Input
-              value={options.jsonData.publicUrl ?? ''}
-              placeholder="http://jaeger.example.com:16686"
-              width={40}
-              onChange={(e) =>
-                onOptionsChange({
-                  ...options,
-                  jsonData: { ...options.jsonData, publicUrl: e.currentTarget.value },
-                })
-              }
-            />
-          </InlineField>
-        </InlineFieldRow>
       </Alert>
+      <h3>Jaeger UI Settings</h3>
+      <InlineFieldRow>
+        <InlineField label="Public URL" labelWidth={24} required>
+          <Input
+            value={options.jsonData.publicUrl ?? ''}
+            placeholder="http://jaeger.example.com:16686"
+            width={40}
+            onChange={(e) =>
+              onOptionsChange({
+                ...options,
+                jsonData: { ...options.jsonData, publicUrl: e.currentTarget.value },
+              })
+            }
+          />
+        </InlineField>
+      </InlineFieldRow>
+      <hr/>
       <ConnectionSettings
         config={options}
         onChange={onOptionsChange}
