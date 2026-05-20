@@ -26,6 +26,9 @@ updates:
           - 'eslint*'
           - '@typescript-eslint/*'
           - '@stylistic/*'
+        update-types:
+          - 'minor'
+          - 'patch'
       grafana:
         patterns:
           - '@grafana/*'
