@@ -41,6 +41,14 @@ for (const ds of DATASOURCES) {
     expect(body.data.length).toBeGreaterThan(0);
   });
 
+  test(`${ds.label}: /api/services returns data via Grafana DataProxy`, async ({ request }) => {
+    const resp = await request.get(`/api/datasources/proxy/uid/${ds.uid}/api/services`);
+    await expect(resp).toBeOK();
+    const body = await resp.json();
+    expect(Array.isArray(body.data)).toBe(true);
+    expect(body.data.length).toBeGreaterThan(0);
+  });
+
   test(`${ds.label}: datasource url (proxy) and publicUrl are provisioned correctly`, async ({ request }) => {
     const resp = await request.get(`/api/datasources/uid/${ds.uid}`);
     await expect(resp).toBeOK();

@@ -144,6 +144,21 @@ describe('JaegerPanel — base URL from datasource', () => {
     expect(iframe.src).toContain('http://localhost:16686');
   });
 
+  it('falls back to settings.url when jsonData.publicUrl is empty string', () => {
+    mockGetDataSourceSrv.mockReturnValue({
+      getInstanceSettings: jest.fn().mockReturnValue({
+        url: 'http://localhost:16686',
+        jsonData: { publicUrl: '' },
+      }),
+    });
+
+    const opts = { ...baseOptions, traceId: 'abc' };
+    render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
+
+    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
+    expect(iframe.src).toContain('http://localhost:16686');
+  });
+
   it('falls back to settings.url when jsonData is absent', () => {
     mockGetDataSourceSrv.mockReturnValue({
       getInstanceSettings: jest.fn().mockReturnValue({ url: 'http://localhost:16686' }),

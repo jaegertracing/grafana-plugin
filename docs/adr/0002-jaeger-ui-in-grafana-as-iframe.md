@@ -337,10 +337,11 @@ The test suite covers two layers:
 - Both options serve `index.html` with the inline base-path detection script (`data-inject-target="BASE_URL"` marker present).
 - `/api/services` returns non-empty data through both proxies.
 - All JS/CSS assets return HTTP 200 through both proxy paths.
-- Datasource `url` is correctly provisioned for each datasource.
+- Datasource `url` and `jsonData.publicUrl` are correctly provisioned for each datasource.
 
-**Grafana integration layer** (Playwright, `tests/reverse-proxy.spec.ts`): 6 assertions pass:
+**Grafana integration layer** (Playwright, `tests/reverse-proxy.spec.ts`): 8 assertions pass:
 - `/api/services` returns data via the `publicUrl` (browser → httpd → Jaeger).
+- `/api/services` returns data via Grafana DataProxy (`/api/datasources/proxy/uid/<uid>/api/services`), validating the internal hostname and network routing.
 - Datasource `url` (DataProxy address, internal httpd hostname) and `jsonData.publicUrl` (browser-accessible address) are correctly provisioned for each datasource.
 - Config page loads and the datasource name is correct for each datasource.
 

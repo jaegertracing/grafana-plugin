@@ -2,10 +2,8 @@
 # Automated e2e test for Jaeger-Grafana integration via reverse proxy.
 #
 # Verifies that:
-#   1. Grafana's DataProxy can reach Jaeger through the httpd reverse proxies
-#      and serve trace data via /api/datasources/proxy/uid/<uid>/api/services
-#   2. The datasource health check passes (Grafana queries Jaeger via DataProxy)
-#   3. The publicUrl (jsonData) is set correctly for iframe rendering
+#   1. The datasource url and jsonData.publicUrl are provisioned correctly
+#   2. The httpd reverse proxies serve Jaeger UI assets and API calls correctly
 #
 # Also validates that the two httpd proxy options correctly serve Jaeger UI and
 # pass /api calls (confirming routing is correct before Grafana is involved).
