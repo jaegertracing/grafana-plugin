@@ -57,49 +57,44 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
   }
 
   private async fetchTraces(query: JaegerQuery, range: TimeRange): Promise<Array<ReturnType<typeof createDataFrame>>> {
-    const params = new URLSearchParams({ service: query.service ?? '' });
-    // Jaeger expects start/end in microseconds
-    params.set('start', String(range.from.valueOf() * 1000));
-    params.set('end', String(range.to.valueOf() * 1000));
+    const params = new URLSearchParams();
+    params.set('query.serviceName', query.service ?? '');
+    // v3 API expects RFC3339Nano timestamps
+    params.set('query.startTimeMin', new Date(range.from.valueOf()).toISOString());
+    params.set('query.startTimeMax', new Date(range.to.valueOf()).toISOString());
     if (query.operation) {
-      params.set('operation', query.operation);
+      params.set('query.operationName', query.operation);
     }
     if (query.limit) {
-      params.set('limit', String(query.limit));
+      params.set('query.searchDepth', String(query.limit));
     }
     if (query.minDuration) {
-      params.set('minDuration', query.minDuration);
+      params.set('query.durationMin', query.minDuration);
     }
     if (query.maxDuration) {
-      params.set('maxDuration', query.maxDuration);
-    }
-    if (query.tags) {
-      // Jaeger HTTP API accepts repeated "tag=key:value" params (colon separator).
-      // The plural "tags" param expects a JSON map; we use "tag" to avoid JSON encoding.
-      for (const pair of query.tags.trim().split(/\s+/)) {
-        if (pair) {
-          params.append('tag', pair);
-        }
-      }
+      params.set('query.durationMax', query.maxDuration);
     }
 
-    interface JaegerSpan {
-      spanID: string;
-      operationName: string;
-      duration: number;
-      startTime: number;
-      processID: string;
-      references: Array<{ refType: string }>;
+    interface ServiceSummary {
+      name: string;
+      spanCount: number;
+      errorSpanCount: number;
     }
-    interface JaegerTrace {
-      traceID: string;
-      spans: JaegerSpan[];
-      processes: Record<string, { serviceName: string }>;
+    interface TraceSummary {
+      traceId: string;
+      rootServiceName: string;
+      rootOperationName: string;
+      minStartTimeUnixNano: string;
+      maxEndTimeUnixNano: string;
+      spanCount: number;
+      errorSpanCount: number;
+      orphanSpanCount: number;
+      services: ServiceSummary[];
     }
 
     const response = await lastValueFrom(
-      getBackendSrv().fetch<{ data: JaegerTrace[] }>({
-        url: `${this.baseUrl}/api/traces?${params}`,
+      getBackendSrv().fetch<{ summaries: TraceSummary[] }>({
+        url: `${this.baseUrl}/api/v3/trace-summaries?${params}`,
       })
     );
 
@@ -115,20 +110,41 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
     const traceIDs: string[] = [];
     const traceNames: string[] = [];
-    const spanCounts: number[] = [];
+    const startTimes: number[] = [];
     const durations: number[] = [];
+    const spanCounts: number[] = [];
+    const errorSpanCounts: number[] = [];
+    const serviceBreakdowns: string[] = [];
 
-    for (const trace of response.data.data ?? []) {
-      const spans: JaegerSpan[] = Array.isArray(trace.spans) ? trace.spans : [];
-      // Root span: the one with no parent reference
-      const rootSpan = spans.find((s) => !s.references?.some((r) => r.refType === 'CHILD_OF'))
-        ?? spans.reduce((a, b) => (a.startTime < b.startTime ? a : b), spans[0]);
-      const service = rootSpan ? (trace.processes[rootSpan.processID]?.serviceName ?? '') : '';
-      const operation = rootSpan?.operationName ?? '';
-      traceIDs.push(trace.traceID);
-      traceNames.push(service && operation ? `${service}: ${operation}` : operation);
-      spanCounts.push(spans.length);
-      durations.push(rootSpan?.duration ?? 0);
+    for (const s of response.data.summaries ?? []) {
+      // Timestamps are decimal strings of Unix nanoseconds (proto3 fixed64 → string).
+      // Divide before parsing to stay within float64 precision (2^53 ≈ 9007 seconds in ns).
+      // ns → µs (divide by 1000); startTime for Grafana time field needs ms (divide by 1000 again)
+      const minUs = parseInt(s.minStartTimeUnixNano || '0', 10) / 1000;
+      const maxUs = parseInt(s.maxEndTimeUnixNano || '0', 10) / 1000;
+      const durationUs = maxUs - minUs;
+      const startTimeMs = minUs / 1000;
+
+      const servicesStr = (s.services ?? [])
+        .map((svc) =>
+          svc.errorSpanCount > 0
+            ? `${svc.name}(${svc.spanCount},⚠${svc.errorSpanCount})`
+            : `${svc.name}(${svc.spanCount})`
+        )
+        .join(' ');
+
+      const name =
+        s.rootServiceName && s.rootOperationName
+          ? `${s.rootServiceName}: ${s.rootOperationName}`
+          : s.rootOperationName || s.rootServiceName;
+
+      traceIDs.push(s.traceId);
+      traceNames.push(name);
+      startTimes.push(startTimeMs);
+      durations.push(durationUs);
+      spanCounts.push(s.spanCount);
+      errorSpanCounts.push(s.errorSpanCount);
+      serviceBreakdowns.push(servicesStr);
     }
 
     return [createDataFrame({
@@ -136,8 +152,11 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       fields: [
         { name: 'traceID', type: FieldType.string, values: traceIDs, config: { links: [traceLink] } },
         { name: 'traceName', type: FieldType.string, values: traceNames },
-        { name: 'spanCount', type: FieldType.number, values: spanCounts },
+        { name: 'startTime', type: FieldType.time, values: startTimes },
         { name: 'duration', type: FieldType.number, values: durations, config: { unit: 'µs' } },
+        { name: 'spanCount', type: FieldType.number, values: spanCounts },
+        { name: 'errorSpanCount', type: FieldType.number, values: errorSpanCounts },
+        { name: 'services', type: FieldType.string, values: serviceBreakdowns },
       ],
     })];
   }

@@ -110,30 +110,28 @@ describe('JaegerDataSource — query (trace mode)', () => {
   });
 });
 
+// 1_000_000_000 ns = 1s; encode as decimal strings (proto3 fixed64 convention)
+const minStartNs = String(1_700_000_000_000_000_000); // 2023-11-14T22:13:20.000Z
+const maxEndNs   = String(1_700_000_000_500_000_000); // +500ms
+
+const mockSummary = {
+  traceId: 'trace1',
+  rootServiceName: 'frontend',
+  rootOperationName: 'HTTP GET /dispatch',
+  minStartTimeUnixNano: minStartNs,
+  maxEndTimeUnixNano: maxEndNs,
+  spanCount: 42,
+  errorSpanCount: 2,
+  orphanSpanCount: 0,
+  services: [
+    { name: 'backend', spanCount: 30, errorSpanCount: 2 },
+    { name: 'frontend', spanCount: 12, errorSpanCount: 0 },
+  ],
+};
+
 describe('JaegerDataSource — query (search mode)', () => {
-  it('calls /api/traces with correct params and returns a traces frame', async () => {
-    const fetch = jest.fn().mockReturnValue(
-      of({
-        data: {
-          data: [
-            {
-              traceID: 'trace1',
-              spans: [
-                {
-                  spanID: 's1',
-                  operationName: 'HTTP GET /dispatch',
-                  duration: 5000,
-                  startTime: 1000,
-                  processID: 'p1',
-                  references: [],
-                },
-              ],
-              processes: { p1: { serviceName: 'frontend' } },
-            },
-          ],
-        },
-      })
-    );
+  it('calls /api/v3/trace-summaries with correct params and returns a traces frame', async () => {
+    const fetch = jest.fn().mockReturnValue(of({ data: { summaries: [mockSummary] } }));
     mockGetBackendSrv.mockReturnValue({ fetch });
 
     const ds = makeInstance('http://jaeger.example.com/jaeger');
@@ -145,17 +143,32 @@ describe('JaegerDataSource — query (search mode)', () => {
     } as any);
 
     const [callArg] = fetch.mock.calls[0];
-    expect(callArg.url).toContain('jaeger.example.com/jaeger/api/traces');
-    expect(callArg.url).toContain('service=frontend');
-    expect(callArg.url).toContain('limit=5');
+    expect(callArg.url).toContain('jaeger.example.com/jaeger/api/v3/trace-summaries');
+    expect(callArg.url).toContain('query.serviceName=frontend');
+    expect(callArg.url).toContain('query.searchDepth=5');
+    expect(callArg.url).toContain('query.startTimeMin=');
 
     expect(result.data).toHaveLength(1);
     const frame = result.data[0];
     expect(frame.name).toBe('traces');
+
     const traceIdField = frame.fields.find((f: any) => f.name === 'traceID');
     expect(traceIdField.values[0]).toBe('trace1');
+
     const traceNameField = frame.fields.find((f: any) => f.name === 'traceName');
     expect(traceNameField.values[0]).toBe('frontend: HTTP GET /dispatch');
+
+    const spanCountField = frame.fields.find((f: any) => f.name === 'spanCount');
+    expect(spanCountField.values[0]).toBe(42);
+
+    const errorField = frame.fields.find((f: any) => f.name === 'errorSpanCount');
+    expect(errorField.values[0]).toBe(2);
+
+    const servicesField = frame.fields.find((f: any) => f.name === 'services');
+    expect(servicesField.values[0]).toBe('backend(30,⚠2) frontend(12)');
+
+    const durationField = frame.fields.find((f: any) => f.name === 'duration');
+    expect(durationField.values[0]).toBeCloseTo(500_000, -1); // 500ms in µs
   });
 
   it('returns empty data when no service is provided', async () => {
@@ -170,7 +183,7 @@ describe('JaegerDataSource — query (search mode)', () => {
 
   it('applies template variable interpolation', async () => {
     mockGetTemplateSrv.mockReturnValue({ replace: (s: string) => s.replace('${svc}', 'driver') });
-    const fetch = jest.fn().mockReturnValue(of({ data: { data: [] } }));
+    const fetch = jest.fn().mockReturnValue(of({ data: { summaries: [] } }));
     mockGetBackendSrv.mockReturnValue({ fetch });
 
     const ds = makeInstance('http://localhost:16686');
@@ -180,7 +193,7 @@ describe('JaegerDataSource — query (search mode)', () => {
     } as any);
 
     const [callArg] = fetch.mock.calls[0];
-    expect(callArg.url).toContain('service=driver');
+    expect(callArg.url).toContain('query.serviceName=driver');
   });
 
   it('skips hidden targets', async () => {
