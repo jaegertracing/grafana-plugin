@@ -12,6 +12,21 @@ import { getBackendSrv, getTemplateSrv, isFetchError } from '@grafana/runtime';
 import { lastValueFrom } from 'rxjs';
 import { JaegerDataSourceOptions, JaegerQuery } from '../types';
 
+// parseLogfmt parses Jaeger's logfmt tag format: space-separated key=value pairs,
+// with quoted values for strings containing spaces or '='.
+// e.g. `error=true db.statement="select * from User"`
+function parseLogfmt(input: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const re = /(\S+?)=("(?:[^"\\]|\\.)*"|\S+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(input)) !== null) {
+    const key = match[1];
+    const raw = match[2];
+    result[key] = raw.startsWith('"') ? raw.slice(1, -1).replace(/\\(.)/g, '$1') : raw;
+  }
+  return result;
+}
+
 export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourceOptions> {
   readonly baseUrl: string;
   readonly publicUrl: string;
@@ -75,15 +90,9 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       params.set('query.durationMax', query.maxDuration);
     }
     if (query.tags) {
-      // Tags field is "key:value" or "key=value" pairs separated by whitespace.
-      // v3 API expects a JSON-encoded map via query.attributes.
-      const attrsMap: Record<string, string> = {};
-      for (const pair of query.tags.trim().split(/\s+/)) {
-        const sep = pair.search(/[:=]/);
-        if (sep > 0) {
-          attrsMap[pair.slice(0, sep)] = pair.slice(sep + 1);
-        }
-      }
+      // Tags use logfmt: key=value pairs, quoted values allowed for strings with spaces/=.
+      // Matches Jaeger UI tag search format.
+      const attrsMap = parseLogfmt(query.tags);
       if (Object.keys(attrsMap).length > 0) {
         params.set('query.attributes', JSON.stringify(attrsMap));
       }
