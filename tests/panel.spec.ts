@@ -30,3 +30,34 @@ test('datasource QueryEditor service dropdown is populated from live Jaeger API'
   // Assert a known HotROD service appears — verifies the live Jaeger API was actually queried
   await expect(explorePage.page.getByRole('option', { name: 'frontend' })).toBeVisible();
 });
+
+test('search query returns trace-summaries result table with expected columns', async ({
+  readProvisionedDataSource,
+  explorePage,
+}) => {
+  const datasource = await readProvisionedDataSource({ fileName: 'datasources.yml' });
+  await explorePage.goto();
+  await explorePage.datasource.set(datasource.name);
+
+  // Select the 'frontend' service and run the query
+  const row = explorePage.getQueryEditorRow('A');
+  const serviceSelect = row.getByRole('combobox', { name: /service/i });
+  await serviceSelect.click();
+  await explorePage.page.getByRole('option', { name: 'frontend' }).click();
+  await explorePage.page.getByRole('button', { name: /run query/i }).click();
+
+  // The results table should contain the columns returned by /api/v3/trace-summaries
+  const table = explorePage.page.getByRole('table');
+  await expect(table).toBeVisible({ timeout: 10000 });
+  const header = table.getByRole('row').first();
+  await expect(header).toContainText('traceID');
+  await expect(header).toContainText('startTime');
+  await expect(header).toContainText('duration');
+  await expect(header).toContainText('spanCount');
+  await expect(header).toContainText('errorSpanCount');
+  await expect(header).toContainText('services');
+
+  // At least one data row should be present
+  const dataRows = table.getByRole('row').filter({ hasNot: explorePage.page.getByRole('columnheader') });
+  await expect(dataRows.first()).toBeVisible();
+});
