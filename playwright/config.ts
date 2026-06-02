@@ -11,7 +11,10 @@ export default defineConfig<PluginOptions>({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: [['html', { outputFolder: './playwright/.report', open: 'never' }]],
+  reporter: [
+    ['html', { outputFolder: './playwright/.report', open: 'never' }],
+    ['json', { outputFile: './playwright/.report/results.json' }],
+  ],
   use: {
     baseURL: process.env.GRAFANA_URL || 'http://localhost:3000',
     trace: 'on-first-retry',

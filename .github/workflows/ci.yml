@@ -289,6 +289,17 @@ jobs:
         id: run-tests
         run: npm run e2e
 
+      - name: Check minimum test count
+        if: ${{ always() && steps.run-tests.outcome != 'cancelled' }}
+        run: |
+          MIN_TESTS=3
+          COUNT=$(jq '.suites | map(.specs | length) | add // 0' playwright/.report/results.json 2>/dev/null || echo 0)
+          echo "Tests ran: $COUNT (minimum: $MIN_TESTS)"
+          if [ "$COUNT" -lt "$MIN_TESTS" ]; then
+            echo "::error::Only $COUNT test(s) ran — expected at least $MIN_TESTS. Possible misconfiguration."
+            exit 1
+          fi
+
       - name: Upload e2e test summary
         uses: grafana/plugin-actions/playwright-gh-pages/upload-report-artifacts@fa3356df288e68f5e900ab466e98b0bf9bad3118 # upload-report-artifacts/v1.0.1
         if: ${{ always() && !cancelled() }}
