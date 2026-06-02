@@ -196,6 +196,24 @@ describe('JaegerDataSource — query (search mode)', () => {
     expect(callArg.url).toContain('query.serviceName=driver');
   });
 
+  it('encodes tags as query.attributes JSON map', async () => {
+    const fetch = jest.fn().mockReturnValue(of({ data: { summaries: [] } }));
+    mockGetBackendSrv.mockReturnValue({ fetch });
+
+    const ds = makeInstance('http://localhost:16686');
+    await ds.query({
+      targets: [{ refId: 'A', queryType: 'search', service: 'frontend', tags: 'http.method:GET error:true' }],
+      range: { from: { valueOf: () => 0 }, to: { valueOf: () => 0 } } as any,
+    } as any);
+
+    const [callArg] = fetch.mock.calls[0];
+    const url = new URL(callArg.url);
+    const attrsParam = url.searchParams.get('query.attributes');
+    expect(attrsParam).not.toBeNull();
+    const attrs = JSON.parse(attrsParam!);
+    expect(attrs).toEqual({ 'http.method': 'GET', 'error': 'true' });
+  });
+
   it('skips hidden targets', async () => {
     const fetch = jest.fn();
     mockGetBackendSrv.mockReturnValue({ fetch });

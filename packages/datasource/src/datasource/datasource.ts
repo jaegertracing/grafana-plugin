@@ -74,6 +74,19 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     if (query.maxDuration) {
       params.set('query.durationMax', query.maxDuration);
     }
+    if (query.tags) {
+      // Tags field is "key:value" pairs separated by whitespace; v3 API expects JSON map.
+      const attrsMap: Record<string, string> = {};
+      for (const pair of query.tags.trim().split(/\s+/)) {
+        const colon = pair.indexOf(':');
+        if (colon > 0) {
+          attrsMap[pair.slice(0, colon)] = pair.slice(colon + 1);
+        }
+      }
+      if (Object.keys(attrsMap).length > 0) {
+        params.set('query.attributes', JSON.stringify(attrsMap));
+      }
+    }
 
     interface ServiceSummary {
       name: string;
