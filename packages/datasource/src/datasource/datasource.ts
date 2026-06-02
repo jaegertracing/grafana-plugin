@@ -133,8 +133,8 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
     const traceIDs: string[] = [];
     const traceNames: string[] = [];
-    const startTimes: number[] = [];
-    const durations: number[] = [];
+    const startTimes: Array<number | null> = [];
+    const durations: Array<number | null> = [];
     const spanCounts: number[] = [];
     const errorSpanCounts: number[] = [];
     const serviceBreakdowns: string[] = [];
@@ -144,11 +144,17 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       // Epoch ns values (~1.7e18) exceed Number.MAX_SAFE_INTEGER, so we must not call
       // parseInt on the full string. Truncate to µs in string space (drop last 3 digits)
       // before parsing — 16-digit µs values are within safe integer range (~1.7e15 < 2^53).
-      const nsToUs = (ns: string | undefined) => parseInt(((ns ?? '0') || '0').slice(0, -3) || '0', 10);
+      // Truncate ns→µs in string space before parseInt to stay within float64 precision.
+      // Treat missing/empty timestamps as null rather than 0 to avoid bogus 1970 startTime.
+      const nsToUs = (ns: string | undefined): number | null => {
+        if (!ns) { return null; }
+        const us = parseInt(ns.slice(0, -3) || '0', 10);
+        return isNaN(us) ? null : us;
+      };
       const minUs = nsToUs(s.minStartTimeUnixNano);
       const maxUs = nsToUs(s.maxEndTimeUnixNano);
-      const durationUs = maxUs - minUs;
-      const startTimeMs = minUs / 1000;
+      const durationUs = minUs !== null && maxUs !== null ? maxUs - minUs : null;
+      const startTimeMs = minUs !== null ? minUs / 1000 : null;
 
       const servicesStr = (s.services ?? [])
         .map((svc) =>
