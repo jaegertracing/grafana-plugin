@@ -25,6 +25,7 @@ test('DataProxy can reach Jaeger — /api/services returns data', async ({
 test('datasource QueryEditor service dropdown is populated from live Jaeger API', async ({
   readProvisionedDataSource,
   explorePage,
+  selectors,
 }) => {
   const datasource = await readProvisionedDataSource({ fileName: 'datasources.yml' });
   await explorePage.goto();
@@ -34,25 +35,27 @@ test('datasource QueryEditor service dropdown is populated from live Jaeger API'
   await serviceSelect.waitFor({ state: 'visible', timeout: 10000 });
   await serviceSelect.click();
   // Assert a known HotROD service appears — verifies the live Jaeger API was actually queried
-  await expect(explorePage.ctx.page.getByRole('option', { name: 'frontend' })).toBeVisible();
+  await expect(explorePage.getByGrafanaSelector(selectors.components.Select.option).filter({ hasText: 'frontend' })).toBeVisible();
 });
 
 test('search query returns trace-summaries result table with expected columns', async ({
   readProvisionedDataSource,
   explorePage,
+  selectors,
 }) => {
   const datasource = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-  await explorePage.goto();
-  await explorePage.datasource.set(datasource.name);
-
   // Widen the viewport so the virtualized grid renders all columns
   await explorePage.ctx.page.setViewportSize({ width: 1600, height: 900 });
+  // Navigate with explicit clean state to avoid stale URL params (e.g. tags from previous tests)
+  await explorePage.ctx.page.goto(
+    `/explore?schemaVersion=1&panes={"left":{"datasource":"${datasource.uid}","queries":[{"refId":"A","queryType":"search"}],"range":{"from":"now-6h","to":"now"}}}&orgId=1`
+  );
 
   // Select the 'frontend' service and run the query
   const serviceSelect = explorePage.ctx.page.getByRole('combobox', { name: 'Service' });
   await serviceSelect.waitFor({ state: 'visible', timeout: 10000 });
   await serviceSelect.click();
-  await explorePage.ctx.page.getByRole('option', { name: 'frontend' }).click();
+  await explorePage.getByGrafanaSelector(selectors.components.Select.option).filter({ hasText: 'frontend' }).click();
   await explorePage.ctx.page.getByRole('button', { name: /run query/i }).click();
 
   // The results grid should contain the columns returned by /api/v3/trace-summaries

@@ -98,9 +98,11 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
             <InlineField
               label="Tags"
               labelWidth={14}
+              htmlFor="query-tags"
               tooltip={'logfmt key=value pairs separated by spaces. Quote values containing spaces. Example: error=true db.statement="select * from User"'}
             >
               <Input
+                id="query-tags"
                 value={query.tags ?? ''}
                 placeholder="error=true http.status_code=200"
                 width={40}
