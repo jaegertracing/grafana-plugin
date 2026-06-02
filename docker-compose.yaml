@@ -23,9 +23,9 @@ services:
       GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: jaegertracing-jaeger-panel,jaegertracing-jaeger-datasource
 
   jaeger:
-    # Default is pinned to a specific digest for reproducibility.
-    # Override the full image reference for snapshot builds, e.g.:
-    #   JAEGER_IMAGE=jaegertracing/jaeger-snapshot:latest make server
+    # Default is a snapshot build identified by its git SHA tag (immutable — not republished).
+    # Override the full image reference to use a release or different snapshot, e.g.:
+    #   JAEGER_IMAGE=jaegertracing/jaeger:2.18.0 make server
     image: ${JAEGER_IMAGE:-jaegertracing/jaeger-snapshot:b976c23b2a4432221bc31c3907ff2648cf190a6d}
     container_name: jaegertracing-jaeger
     ports:

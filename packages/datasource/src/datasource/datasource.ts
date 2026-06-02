@@ -90,8 +90,8 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       params.set('query.durationMax', query.maxDuration);
     }
     if (query.tags) {
-      // Tags use logfmt: key=value pairs, quoted values allowed for strings with spaces/=.
-      // Matches Jaeger UI tag search format.
+      // Tags use logfmt: key=value pairs, quoted values allowed for strings with spaces.
+      // Unquoted values may contain '=' (split on first '='). Matches Jaeger UI tag format.
       const attrsMap = parseLogfmt(query.tags);
       if (Object.keys(attrsMap).length > 0) {
         params.set('query.attributes', JSON.stringify(attrsMap));
