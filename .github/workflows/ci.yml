@@ -282,6 +282,18 @@ jobs:
         with:
           url: http://localhost:3000/login
 
+      - name: Warm up HotROD (generate initial traces)
+        run: |
+          for i in $(seq 1 10); do
+            curl -sf http://localhost:8080/dispatch?customer=123 -o /dev/null || true
+          done
+          # Wait for services to register in Jaeger
+          for i in $(seq 1 30); do
+            COUNT=$(curl -s http://localhost:16686/api/services | jq '.data | length' 2>/dev/null || echo 0)
+            if [ "$COUNT" -gt 1 ]; then echo "Services ready ($COUNT)"; break; fi
+            sleep 2
+          done
+
       - name: Install Playwright Browsers
         run: npm exec playwright install chromium --with-deps
 
