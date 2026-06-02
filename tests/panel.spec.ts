@@ -28,14 +28,15 @@ test('datasource QueryEditor service dropdown is populated from live Jaeger API'
   const datasource = await readProvisionedDataSource({ fileName: 'datasources.yml' });
   await explorePage.goto();
   await explorePage.datasource.set(datasource.name);
-  // The QueryEditor renders a Service select identified by its placeholder text
-  const serviceSelect = explorePage.ctx.page.locator('input[aria-describedby$="-placeholder"]').first();
+  // Wait for the QueryEditor to finish rendering after datasource selection
+  const serviceSelect = explorePage.ctx.page.getByRole('combobox', { name: 'Service' });
+  await serviceSelect.waitFor({ state: 'visible', timeout: 10000 });
   await serviceSelect.click();
   // Assert a known HotROD service appears — verifies the live Jaeger API was actually queried
   await expect(explorePage.ctx.page.getByRole('option', { name: 'frontend' })).toBeVisible();
 });
 
-test.skip('search query returns trace-summaries result table with expected columns', async ({
+test('search query returns trace-summaries result table with expected columns', async ({
   readProvisionedDataSource,
   explorePage,
 }) => {
@@ -43,25 +44,29 @@ test.skip('search query returns trace-summaries result table with expected colum
   await explorePage.goto();
   await explorePage.datasource.set(datasource.name);
 
+  // Widen the viewport so the virtualized grid renders all columns
+  await explorePage.ctx.page.setViewportSize({ width: 1600, height: 900 });
+
   // Select the 'frontend' service and run the query
-  const serviceSelect = explorePage.ctx.page.locator('input[aria-describedby$="-placeholder"]').first();
+  const serviceSelect = explorePage.ctx.page.getByRole('combobox', { name: 'Service' });
+  await serviceSelect.waitFor({ state: 'visible', timeout: 10000 });
   await serviceSelect.click();
   await explorePage.ctx.page.getByRole('option', { name: 'frontend' }).click();
   await explorePage.ctx.page.getByRole('button', { name: /run query/i }).click();
 
-  // The results table should contain the columns returned by /api/v3/trace-summaries
-  const table = explorePage.ctx.page.getByRole('table');
-  await expect(table).toBeVisible({ timeout: 10000 });
-  const header = table.getByRole('row').first();
-  await expect(header).toContainText('traceID');
-  await expect(header).toContainText('traceName');
-  await expect(header).toContainText('startTime');
-  await expect(header).toContainText('duration');
-  await expect(header).toContainText('spanCount');
-  await expect(header).toContainText('errorCount');
-  await expect(header).toContainText('services');
+  // The results grid should contain the columns returned by /api/v3/trace-summaries
+  // Grafana's table component uses role="grid" (not role="table")
+  const grid = explorePage.ctx.page.getByRole('grid');
+  await expect(grid).toBeVisible({ timeout: 10000 });
+  const headers = grid.getByRole('columnheader');
+  await expect(headers.filter({ hasText: 'traceID' })).toBeVisible();
+  await expect(headers.filter({ hasText: 'traceName' })).toBeVisible();
+  await expect(headers.filter({ hasText: 'startTime' })).toBeVisible();
+  await expect(headers.filter({ hasText: 'duration' })).toBeVisible();
+  await expect(headers.filter({ hasText: 'spanCount' })).toBeVisible();
+  await expect(headers.filter({ hasText: 'errorCount' })).toBeVisible();
+  await expect(headers.filter({ hasText: 'services' })).toBeVisible();
 
   // At least one data row should be present
-  const dataRows = table.getByRole('row').filter({ hasNot: explorePage.ctx.page.getByRole('columnheader') });
-  await expect(dataRows.first()).toBeVisible();
+  await expect(grid.getByRole('row').nth(1)).toBeVisible();
 });

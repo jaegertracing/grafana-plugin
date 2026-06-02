@@ -13,7 +13,7 @@ import { lastValueFrom } from 'rxjs';
 import { JaegerDataSourceOptions, JaegerQuery } from '../types';
 
 // parseLogfmt parses Jaeger's logfmt tag format: space-separated key=value pairs,
-// with quoted values for strings containing spaces or '='.
+// with quoted values for strings containing spaces.
 // e.g. `error=true db.statement="select * from User"`
 function parseLogfmt(input: string): Record<string, string> {
   const result: Record<string, string> = {};
