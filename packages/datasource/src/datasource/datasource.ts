@@ -131,10 +131,12 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
     for (const s of response.data.summaries ?? []) {
       // Timestamps are decimal strings of Unix nanoseconds (proto3 fixed64 → string).
-      // Divide before parsing to stay within float64 precision (2^53 ≈ 9007 seconds in ns).
-      // ns → µs (divide by 1000); startTime for Grafana time field needs ms (divide by 1000 again)
-      const minUs = parseInt(s.minStartTimeUnixNano || '0', 10) / 1000;
-      const maxUs = parseInt(s.maxEndTimeUnixNano || '0', 10) / 1000;
+      // Epoch ns values (~1.7e18) exceed Number.MAX_SAFE_INTEGER, so we must not call
+      // parseInt on the full string. Truncate to µs in string space (drop last 3 digits)
+      // before parsing — 16-digit µs values are within safe integer range (~1.7e15 < 2^53).
+      const nsToUs = (ns: string) => parseInt((ns || '0').slice(0, -3) || '0', 10);
+      const minUs = nsToUs(s.minStartTimeUnixNano);
+      const maxUs = nsToUs(s.maxEndTimeUnixNano);
       const durationUs = maxUs - minUs;
       const startTimeMs = minUs / 1000;
 

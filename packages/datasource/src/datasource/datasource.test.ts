@@ -110,9 +110,11 @@ describe('JaegerDataSource — query (trace mode)', () => {
   });
 });
 
-// 1_000_000_000 ns = 1s; encode as decimal strings (proto3 fixed64 convention)
-const minStartNs = String(1_700_000_000_000_000_000); // 2023-11-14T22:13:20.000Z
-const maxEndNs   = String(1_700_000_000_500_000_000); // +500ms
+// Exact decimal strings of Unix nanoseconds (proto3 fixed64 convention).
+// Must be string literals — these values exceed Number.MAX_SAFE_INTEGER and would
+// lose precision if written as JS numeric literals before stringification.
+const minStartNs = '1700000000000000000'; // 2023-11-14T22:13:20.000Z
+const maxEndNs   = '1700000000500000000'; // +500ms
 
 const mockSummary = {
   traceId: 'trace1',
