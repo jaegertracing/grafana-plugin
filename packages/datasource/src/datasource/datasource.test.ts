@@ -114,7 +114,7 @@ describe('JaegerDataSource — query (trace mode)', () => {
 // Must be string literals — these values exceed Number.MAX_SAFE_INTEGER and would
 // lose precision if written as JS numeric literals before stringification.
 const minStartNs = '1700000000000000000'; // 2023-11-14T22:13:20.000Z
-const maxEndNs   = '1700000000500000000'; // +500ms
+const maxEndNs = '1700000000500000000'; // +500ms
 
 const mockSummary = {
   traceId: 'trace1',
