@@ -100,19 +100,19 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
     interface ServiceSummary {
       name: string;
-      spanCount: number;
-      errorSpanCount: number;
+      spanCount?: number;
+      errorSpanCount?: number;
     }
     interface TraceSummary {
       traceId: string;
-      rootServiceName: string;
-      rootOperationName: string;
-      minStartTimeUnixNano: string;
-      maxEndTimeUnixNano: string;
-      spanCount: number;
-      errorSpanCount: number;
-      orphanSpanCount: number;
-      services: ServiceSummary[];
+      rootServiceName?: string;
+      rootOperationName?: string;
+      minStartTimeUnixNano?: string;
+      maxEndTimeUnixNano?: string;
+      spanCount?: number;
+      errorSpanCount?: number;
+      orphanSpanCount?: number;
+      services?: ServiceSummary[];
     }
 
     const response = await lastValueFrom(
@@ -144,7 +144,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       // Epoch ns values (~1.7e18) exceed Number.MAX_SAFE_INTEGER, so we must not call
       // parseInt on the full string. Truncate to µs in string space (drop last 3 digits)
       // before parsing — 16-digit µs values are within safe integer range (~1.7e15 < 2^53).
-      const nsToUs = (ns: string) => parseInt((ns || '0').slice(0, -3) || '0', 10);
+      const nsToUs = (ns: string | undefined) => parseInt(((ns ?? '0') || '0').slice(0, -3) || '0', 10);
       const minUs = nsToUs(s.minStartTimeUnixNano);
       const maxUs = nsToUs(s.maxEndTimeUnixNano);
       const durationUs = maxUs - minUs;
@@ -152,23 +152,23 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
       const servicesStr = (s.services ?? [])
         .map((svc) =>
-          svc.errorSpanCount > 0
-            ? `${svc.name}(${svc.spanCount},⚠${svc.errorSpanCount})`
-            : `${svc.name}(${svc.spanCount})`
+          (svc.errorSpanCount ?? 0) > 0
+            ? `${svc.name}(${svc.spanCount ?? 0},⚠${svc.errorSpanCount})`
+            : `${svc.name}(${svc.spanCount ?? 0})`
         )
         .join(' ');
 
       const name =
         s.rootServiceName && s.rootOperationName
           ? `${s.rootServiceName}: ${s.rootOperationName}`
-          : s.rootOperationName || s.rootServiceName;
+          : s.rootOperationName ?? s.rootServiceName ?? '';
 
       traceIDs.push(s.traceId);
       traceNames.push(name);
       startTimes.push(startTimeMs);
       durations.push(durationUs);
-      spanCounts.push(s.spanCount);
-      errorSpanCounts.push(s.errorSpanCount);
+      spanCounts.push(s.spanCount ?? 0);
+      errorSpanCounts.push(s.errorSpanCount ?? 0);
       serviceBreakdowns.push(servicesStr);
     }
 
