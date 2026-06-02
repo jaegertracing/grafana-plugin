@@ -68,8 +68,9 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
       {queryType === 'search' && (
         <>
           <InlineFieldRow>
-            <InlineField label="Service" labelWidth={14}>
+            <InlineField label="Service" labelWidth={14} htmlFor="query-service">
               <Select
+                inputId="query-service"
                 value={query.service ? { label: query.service, value: query.service } : null}
                 options={services.map((s) => ({ label: s, value: s }))}
                 width={32}
@@ -80,8 +81,9 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
                 placeholder="Select service or enter variable"
               />
             </InlineField>
-            <InlineField label="Operation" labelWidth={14}>
+            <InlineField label="Operation" labelWidth={14} htmlFor="query-operation">
               <Select
+                inputId="query-operation"
                 value={operations.find((o) => o === query.operation) ? { label: query.operation, value: query.operation } : null}
                 options={operations.map((o) => ({ label: o, value: o }))}
                 width={32}
@@ -93,10 +95,16 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
             </InlineField>
           </InlineFieldRow>
           <InlineFieldRow>
-            <InlineField label="Tags" labelWidth={14} tooltip="key:value pairs separated by spaces">
+            <InlineField
+              label="Tags"
+              labelWidth={14}
+              htmlFor="query-tags"
+              tooltip={'logfmt key=value pairs separated by spaces. Quote values containing spaces. Example: error=true db.statement="select * from User"'}
+            >
               <Input
+                id="query-tags"
                 value={query.tags ?? ''}
-                placeholder="http.status_code:200 error:true"
+                placeholder="error=true http.status_code=200"
                 width={40}
                 onChange={(e) => onChange({ ...query, tags: e.currentTarget.value })}
                 onBlur={onRunQuery}

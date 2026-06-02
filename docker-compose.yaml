@@ -23,7 +23,10 @@ services:
       GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: jaegertracing-jaeger-panel,jaegertracing-jaeger-datasource
 
   jaeger:
-    image: jaegertracing/jaeger:2.18.0@sha256:d2cbd047e44b50c11454820f84fd5f34c24a435e5301cf94fe026bf055db80b3
+    # Default is a snapshot build identified by its git SHA tag (immutable — not republished).
+    # Override the full image reference to use a release or different snapshot, e.g.:
+    #   JAEGER_IMAGE=jaegertracing/jaeger:2.18.0 make server
+    image: ${JAEGER_IMAGE:-jaegertracing/jaeger-snapshot:b976c23b2a4432221bc31c3907ff2648cf190a6d}
     container_name: jaegertracing-jaeger
     ports:
       - "16686:16686"
@@ -31,7 +34,7 @@ services:
       - "4318:4318"
 
   hotrod:
-    image: jaegertracing/example-hotrod:2.18.0@sha256:61627c2d827bae3ba2e09c90c447272f3e642fe6eadc2f1fca6b542d45a9ea56
+    image: ${HOTROD_IMAGE:-jaegertracing/example-hotrod:2.18.0@sha256:61627c2d827bae3ba2e09c90c447272f3e642fe6eadc2f1fca6b542d45a9ea56}
     container_name: jaegertracing-hotrod
     ports:
       - "8080:8080"
