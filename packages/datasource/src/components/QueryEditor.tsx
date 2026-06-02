@@ -93,7 +93,7 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
             </InlineField>
           </InlineFieldRow>
           <InlineFieldRow>
-            <InlineField label="Tags" labelWidth={14} tooltip="key:value pairs separated by spaces">
+            <InlineField label="Tags" labelWidth={14} tooltip="key:value or key=value pairs separated by spaces">
               <Input
                 value={query.tags ?? ''}
                 placeholder="http.status_code:200 error:true"

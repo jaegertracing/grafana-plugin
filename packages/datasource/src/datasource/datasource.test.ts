@@ -163,7 +163,7 @@ describe('JaegerDataSource — query (search mode)', () => {
     const spanCountField = frame.fields.find((f: any) => f.name === 'spanCount');
     expect(spanCountField.values[0]).toBe(42);
 
-    const errorField = frame.fields.find((f: any) => f.name === 'errorSpanCount');
+    const errorField = frame.fields.find((f: any) => f.name === 'errorCount');
     expect(errorField.values[0]).toBe(2);
 
     const servicesField = frame.fields.find((f: any) => f.name === 'services');
@@ -198,7 +198,7 @@ describe('JaegerDataSource — query (search mode)', () => {
     expect(callArg.url).toContain('query.serviceName=driver');
   });
 
-  it('encodes tags as query.attributes JSON map', async () => {
+  it('encodes tags as query.attributes JSON map (colon separator)', async () => {
     const fetch = jest.fn().mockReturnValue(of({ data: { summaries: [] } }));
     mockGetBackendSrv.mockReturnValue({ fetch });
 
@@ -210,10 +210,24 @@ describe('JaegerDataSource — query (search mode)', () => {
 
     const [callArg] = fetch.mock.calls[0];
     const url = new URL(callArg.url);
-    const attrsParam = url.searchParams.get('query.attributes');
-    expect(attrsParam).not.toBeNull();
-    const attrs = JSON.parse(attrsParam!);
+    const attrs = JSON.parse(url.searchParams.get('query.attributes')!);
     expect(attrs).toEqual({ 'http.method': 'GET', 'error': 'true' });
+  });
+
+  it('encodes tags as query.attributes JSON map (equals separator)', async () => {
+    const fetch = jest.fn().mockReturnValue(of({ data: { summaries: [] } }));
+    mockGetBackendSrv.mockReturnValue({ fetch });
+
+    const ds = makeInstance('http://localhost:16686');
+    await ds.query({
+      targets: [{ refId: 'A', queryType: 'search', service: 'frontend', tags: 'driver=T702693C' }],
+      range: { from: { valueOf: () => 0 }, to: { valueOf: () => 0 } } as any,
+    } as any);
+
+    const [callArg] = fetch.mock.calls[0];
+    const url = new URL(callArg.url);
+    const attrs = JSON.parse(url.searchParams.get('query.attributes')!);
+    expect(attrs).toEqual({ 'driver': 'T702693C' });
   });
 
   it('skips hidden targets', async () => {

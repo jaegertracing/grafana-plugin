@@ -75,12 +75,13 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
       params.set('query.durationMax', query.maxDuration);
     }
     if (query.tags) {
-      // Tags field is "key:value" pairs separated by whitespace; v3 API expects JSON map.
+      // Tags field is "key:value" or "key=value" pairs separated by whitespace.
+      // v3 API expects a JSON-encoded map via query.attributes.
       const attrsMap: Record<string, string> = {};
       for (const pair of query.tags.trim().split(/\s+/)) {
-        const colon = pair.indexOf(':');
-        if (colon > 0) {
-          attrsMap[pair.slice(0, colon)] = pair.slice(colon + 1);
+        const sep = pair.search(/[:=]/);
+        if (sep > 0) {
+          attrsMap[pair.slice(0, sep)] = pair.slice(sep + 1);
         }
       }
       if (Object.keys(attrsMap).length > 0) {
@@ -165,13 +166,13 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     return [createDataFrame({
       name: 'traces',
       fields: [
-        { name: 'traceID', type: FieldType.string, values: traceIDs, config: { links: [traceLink] } },
-        { name: 'traceName', type: FieldType.string, values: traceNames },
-        { name: 'startTime', type: FieldType.time, values: startTimes },
-        { name: 'duration', type: FieldType.number, values: durations, config: { unit: 'µs' } },
-        { name: 'spanCount', type: FieldType.number, values: spanCounts },
-        { name: 'errorSpanCount', type: FieldType.number, values: errorSpanCounts },
-        { name: 'services', type: FieldType.string, values: serviceBreakdowns },
+        { name: 'traceID', type: FieldType.string, values: traceIDs, config: { links: [traceLink], custom: { width: 200 } } },
+        { name: 'traceName', type: FieldType.string, values: traceNames, config: { custom: { width: 300 } } },
+        { name: 'startTime', type: FieldType.time, values: startTimes, config: { custom: { width: 180 } } },
+        { name: 'duration', type: FieldType.number, values: durations, config: { unit: 'µs', custom: { width: 100 } } },
+        { name: 'spanCount', type: FieldType.number, values: spanCounts, config: { custom: { width: 90 } } },
+        { name: 'errorCount', type: FieldType.number, values: errorSpanCounts, config: { custom: { width: 90 } } },
+        { name: 'services', type: FieldType.string, values: serviceBreakdowns, config: { custom: { minWidth: 200 } } },
       ],
     })];
   }
