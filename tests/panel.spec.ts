@@ -54,7 +54,7 @@ test('search query returns trace-summaries result table with expected columns', 
   await expect(header).toContainText('startTime');
   await expect(header).toContainText('duration');
   await expect(header).toContainText('spanCount');
-  await expect(header).toContainText('errorSpanCount');
+  await expect(header).toContainText('errorCount');
   await expect(header).toContainText('services');
 
   // At least one data row should be present
