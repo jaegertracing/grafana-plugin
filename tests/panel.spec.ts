@@ -51,6 +51,7 @@ test('search query returns trace-summaries result table with expected columns', 
   await expect(table).toBeVisible({ timeout: 10000 });
   const header = table.getByRole('row').first();
   await expect(header).toContainText('traceID');
+  await expect(header).toContainText('traceName');
   await expect(header).toContainText('startTime');
   await expect(header).toContainText('duration');
   await expect(header).toContainText('spanCount');

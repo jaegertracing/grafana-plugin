@@ -96,7 +96,7 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
             <InlineField label="Tags" labelWidth={14} tooltip='logfmt key=value pairs separated by spaces. Quote values with spaces or "=". Example: error=true db.statement="select * from User"'>
               <Input
                 value={query.tags ?? ''}
-                placeholder="http.status_code:200 error:true"
+                placeholder="error=true http.status_code=200"
                 width={40}
                 onChange={(e) => onChange({ ...query, tags: e.currentTarget.value })}
                 onBlur={onRunQuery}
