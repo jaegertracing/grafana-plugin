@@ -7,3 +7,4 @@ playwright/.report-reverse-proxy/
 playwright/.test-results/
 playwright/.test-results-reverse-proxy/
 
+.claude/settings.local.json
