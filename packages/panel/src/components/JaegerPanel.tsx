@@ -6,7 +6,7 @@ import { JaegerPanelOptions } from '../types';
 
 type Props = PanelProps<JaegerPanelOptions>;
 
-function traceEmbedParams(options: JaegerPanelOptions, isDark: boolean): URLSearchParams {
+function embedParams(options: JaegerPanelOptions, isDark: boolean): URLSearchParams {
   const params = new URLSearchParams({ uiEmbed: 'v0', uiTheme: isDark ? 'dark' : 'light' });
   if (options.hideTimelineMinimap) {
     params.set('uiTimelineHideMinimap', '1');
@@ -64,7 +64,7 @@ function buildUrl(
       if (!traceId) {
         return null;
       }
-      return `${base}/trace/${encodeURIComponent(traceId)}?${traceEmbedParams(options, isDark)}`;
+      return `${base}/trace/${encodeURIComponent(traceId)}?${embedParams(options, isDark)}`;
     }
 
     case 'diff': {
@@ -73,7 +73,7 @@ function buildUrl(
       if (!traceId || !traceIdB) {
         return null;
       }
-      return `${base}/trace/${encodeURIComponent(traceId)}...${encodeURIComponent(traceIdB)}?${traceEmbedParams(options, isDark)}`;
+      return `${base}/trace/${encodeURIComponent(traceId)}...${encodeURIComponent(traceIdB)}?${embedParams(options, isDark)}`;
     }
 
     case 'search': {
@@ -141,7 +141,7 @@ export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, rep
   if (frameTraceId && base) {
     return (
       <iframe
-        src={`${base}/trace/${encodeURIComponent(frameTraceId)}?${traceEmbedParams(options, isDark)}`}
+        src={`${base}/trace/${encodeURIComponent(frameTraceId)}?${embedParams(options, isDark)}`}
         width={width}
         height={iframeHeight}
         style={{ border: 'none', display: 'block' }}
