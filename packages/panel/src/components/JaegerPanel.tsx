@@ -83,12 +83,9 @@ function buildUrl(
       if (!service) {
         return null;
       }
-      const searchParams = new URLSearchParams({
-        uiEmbed: 'v0',
-        uiTheme: isDark ? 'dark' : 'light',
-        uiSearchHideGraph: '1',
-        service,
-      });
+      const searchParams = embedParams(options, isDark);
+      searchParams.set('uiSearchHideGraph', '1');
+      searchParams.set('service', service);
       return `${base}/search?${searchParams}`;
     }
 
