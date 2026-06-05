@@ -2,12 +2,19 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { FieldType, LoadingState, toDataFrame } from '@grafana/data';
 import { getDataSourceSrv } from '@grafana/runtime';
+import { useTheme2 } from '@grafana/ui';
 import { JaegerPanel } from './JaegerPanel';
 import { JaegerPanelOptions } from '../types';
 
 jest.mock('@grafana/runtime', () => ({
   getDataSourceSrv: jest.fn(),
 }));
+
+jest.mock('@grafana/ui', () => ({
+  useTheme2: jest.fn(() => ({ isDark: false })),
+}));
+
+const mockUseTheme2 = useTheme2 as jest.Mock;
 
 const mockGetDataSourceSrv = getDataSourceSrv as jest.Mock;
 
@@ -199,5 +206,60 @@ describe('JaegerPanel — base URL from datasource', () => {
     const opts = { ...baseOptions, traceId: 'mno' };
     render(<JaegerPanel {...baseProps} options={opts} />);
     expect(screen.getByTestId('jaeger-panel-hint')).toHaveTextContent('Select a Jaeger datasource');
+  });
+});
+
+describe('JaegerPanel — theme synchronization', () => {
+  const dataWithTarget = {
+    series: [],
+    state: LoadingState.Done,
+    timeRange: {} as any,
+    request: { targets: [{ datasource: { uid: dsUid } }] } as any,
+  };
+
+  beforeEach(() => {
+    mockGetDataSourceSrv.mockReturnValue({
+      getInstanceSettings: jest.fn().mockReturnValue({ url: 'http://jaeger:16686' }),
+    });
+  });
+
+  it('passes uiTheme=light when Grafana theme is light', () => {
+    mockUseTheme2.mockReturnValue({ isDark: false });
+    const opts = { ...baseOptions, traceId: 'abc' };
+    render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
+    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
+    expect(iframe.src).toContain('uiTheme=light');
+    expect(iframe.src).not.toContain('uiTheme=dark');
+  });
+
+  it('passes uiTheme=dark when Grafana theme is dark', () => {
+    mockUseTheme2.mockReturnValue({ isDark: true });
+    const opts = { ...baseOptions, traceId: 'abc' };
+    render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
+    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
+    expect(iframe.src).toContain('uiTheme=dark');
+    expect(iframe.src).not.toContain('uiTheme=light');
+  });
+
+  it('passes uiTheme in DataFrame-driven path', () => {
+    mockUseTheme2.mockReturnValue({ isDark: true });
+    const frame = toDataFrame({
+      name: 'abc123',
+      fields: [{ name: 'traceID', type: FieldType.string, values: ['abc123'] }],
+    });
+    const opts = { ...baseOptions, datasourceUid: dsUid };
+    render(
+      <JaegerPanel {...baseProps} options={opts} data={{ series: [frame], state: LoadingState.Done, timeRange: {} as any }} />
+    );
+    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
+    expect(iframe.src).toContain('uiTheme=dark');
+  });
+
+  it('passes uiTheme in search mode', () => {
+    mockUseTheme2.mockReturnValue({ isDark: true });
+    const opts = { ...baseOptions, mode: 'search' as const, service: 'frontend' };
+    render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
+    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
+    expect(iframe.src).toContain('uiTheme=dark');
   });
 });

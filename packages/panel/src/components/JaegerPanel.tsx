@@ -1,12 +1,13 @@
 import React from 'react';
 import { FieldType, PanelProps } from '@grafana/data';
 import { getDataSourceSrv } from '@grafana/runtime';
+import { useTheme2 } from '@grafana/ui';
 import { JaegerPanelOptions } from '../types';
 
 type Props = PanelProps<JaegerPanelOptions>;
 
-function traceEmbedParams(options: JaegerPanelOptions): URLSearchParams {
-  const params = new URLSearchParams({ uiEmbed: 'v0' });
+function traceEmbedParams(options: JaegerPanelOptions, isDark: boolean): URLSearchParams {
+  const params = new URLSearchParams({ uiEmbed: 'v0', uiTheme: isDark ? 'dark' : 'light' });
   if (options.hideTimelineMinimap) {
     params.set('uiTimelineHideMinimap', '1');
   }
@@ -51,14 +52,19 @@ function getBase(data: Props['data'], options: JaegerPanelOptions): string | nul
   return resolveBaseFromDatasource(uid);
 }
 
-function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceVariables'], base: string): string | null {
+function buildUrl(
+  options: JaegerPanelOptions,
+  replaceVariables: Props['replaceVariables'],
+  base: string,
+  isDark: boolean
+): string | null {
   switch (options.mode) {
     case 'trace': {
       const traceId = replaceVariables(options.traceId ?? '').trim();
       if (!traceId) {
         return null;
       }
-      return `${base}/trace/${encodeURIComponent(traceId)}?${traceEmbedParams(options)}`;
+      return `${base}/trace/${encodeURIComponent(traceId)}?${traceEmbedParams(options, isDark)}`;
     }
 
     case 'diff': {
@@ -67,7 +73,7 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
       if (!traceId || !traceIdB) {
         return null;
       }
-      return `${base}/trace/${encodeURIComponent(traceId)}...${encodeURIComponent(traceIdB)}?${traceEmbedParams(options)}`;
+      return `${base}/trace/${encodeURIComponent(traceId)}...${encodeURIComponent(traceIdB)}?${traceEmbedParams(options, isDark)}`;
     }
 
     case 'search': {
@@ -77,7 +83,12 @@ function buildUrl(options: JaegerPanelOptions, replaceVariables: Props['replaceV
       if (!service) {
         return null;
       }
-      const searchParams = new URLSearchParams({ uiEmbed: 'v0', uiSearchHideGraph: '1', service });
+      const searchParams = new URLSearchParams({
+        uiEmbed: 'v0',
+        uiTheme: isDark ? 'dark' : 'light',
+        uiSearchHideGraph: '1',
+        service,
+      });
       return `${base}/search?${searchParams}`;
     }
 
@@ -120,6 +131,7 @@ function traceIdFromData(data: Props['data']): string | null {
 const MIN_IFRAME_HEIGHT = 600;
 
 export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, replaceVariables }) => {
+  const { isDark } = useTheme2();
   const iframeHeight = Math.max(height, MIN_IFRAME_HEIGHT);
   const base = getBase(data, options);
 
@@ -129,7 +141,7 @@ export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, rep
   if (frameTraceId && base) {
     return (
       <iframe
-        src={`${base}/trace/${encodeURIComponent(frameTraceId)}?${traceEmbedParams(options)}`}
+        src={`${base}/trace/${encodeURIComponent(frameTraceId)}?${traceEmbedParams(options, isDark)}`}
         width={width}
         height={iframeHeight}
         style={{ border: 'none', display: 'block' }}
@@ -140,7 +152,7 @@ export const JaegerPanel: React.FC<Props> = ({ options, data, width, height, rep
   }
 
   // Panel-options path: dashboard panels with $traceId variable, search mode, diff mode.
-  const url = base ? buildUrl(options, replaceVariables, base) : null;
+  const url = base ? buildUrl(options, replaceVariables, base, isDark) : null;
 
   if (!url) {
     return (
