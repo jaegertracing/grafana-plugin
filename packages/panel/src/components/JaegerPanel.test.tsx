@@ -262,4 +262,12 @@ describe('JaegerPanel — theme synchronization', () => {
     const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
     expect(iframe.src).toContain('uiTheme=dark');
   });
+
+  it('passes uiTheme in diff mode', () => {
+    mockUseTheme2.mockReturnValue({ isDark: true });
+    const opts = { ...baseOptions, mode: 'diff' as const, traceId: 'aaa', traceIdB: 'bbb' };
+    render(<JaegerPanel {...baseProps} options={opts} data={dataWithTarget} />);
+    const iframe = screen.getByTestId('jaeger-panel-iframe') as HTMLIFrameElement;
+    expect(iframe.src).toContain('uiTheme=dark');
+  });
 });
