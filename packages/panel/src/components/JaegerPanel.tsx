@@ -6,8 +6,12 @@ import { JaegerPanelOptions } from '../types';
 
 type Props = PanelProps<JaegerPanelOptions>;
 
+function baseEmbedParams(isDark: boolean): URLSearchParams {
+  return new URLSearchParams({ uiEmbed: 'v0', uiTheme: isDark ? 'dark' : 'light' });
+}
+
 function embedParams(options: JaegerPanelOptions, isDark: boolean): URLSearchParams {
-  const params = new URLSearchParams({ uiEmbed: 'v0', uiTheme: isDark ? 'dark' : 'light' });
+  const params = baseEmbedParams(isDark);
   if (options.hideTimelineMinimap) {
     params.set('uiTimelineHideMinimap', '1');
   }
@@ -83,7 +87,9 @@ function buildUrl(
       if (!service) {
         return null;
       }
-      const searchParams = embedParams(options, isDark);
+      const searchParams = baseEmbedParams(isDark);
+      // The service graph is hidden because it takes up significant panel space and offers
+      // no extra information beyond what the search results table already shows.
       searchParams.set('uiSearchHideGraph', '1');
       searchParams.set('service', service);
       return `${base}/search?${searchParams}`;
