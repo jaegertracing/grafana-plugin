@@ -81,16 +81,22 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
                 placeholder="Select service or enter variable"
               />
             </InlineField>
-            <InlineField label="Operation" labelWidth={14} htmlFor="query-operation">
+            <InlineField
+              label="Span Name"
+              labelWidth={14}
+              htmlFor="query-operation"
+              tooltip="Names are suggested for the selected service. Type any name to search across all services, where the storage backend supports it."
+            >
               <Select
                 inputId="query-operation"
-                value={operations.find((o) => o === query.operation) ? { label: query.operation, value: query.operation } : null}
+                value={query.operation ? { label: query.operation, value: query.operation } : null}
                 options={operations.map((o) => ({ label: o, value: o }))}
                 width={32}
-                onChange={(v) => onChange({ ...query, operation: v?.value ?? undefined })}
+                onChange={(v) => { onChange({ ...query, operation: v?.value ?? undefined }); }}
+                onCreateOption={(v) => { onChange({ ...query, operation: v }); }}
                 isClearable
-                placeholder="Select operation"
-                disabled={!query.service}
+                allowCustomValue
+                placeholder="Select or enter span name"
               />
             </InlineField>
           </InlineFieldRow>
