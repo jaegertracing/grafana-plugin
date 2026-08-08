@@ -59,7 +59,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     if (interpolated.queryType === 'trace') {
       return Promise.resolve(interpolated.traceId ? this.fetchTrace(interpolated.traceId) : []);
     }
-    return interpolated.service ? this.fetchTraces(interpolated, range) : [];
+    return this.fetchTraces(interpolated, range);
   }
 
   private fetchTrace(traceId: string): Array<ReturnType<typeof createDataFrame>> {
