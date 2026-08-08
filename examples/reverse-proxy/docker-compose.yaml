@@ -2,7 +2,7 @@ services:
   # Option 1: Jaeger with base_path set, transparent proxy (no prefix stripping).
   # httpd1 passes /jaeger/ui/* through to jaeger1:16686/jaeger/ui/* unchanged.
   jaeger1:
-    image: jaegertracing/jaeger:2.18.0
+    image: jaegertracing/jaeger-snapshot:6102e1d23f6a6e7db76e8a595b94a12c55b35a86
     command: "--set extensions.jaeger_query.base_path=/jaeger/ui"
     networks:
       - proxy-net
@@ -32,7 +32,7 @@ services:
   # so no response-body rewriting is needed. Allows Jaeger to serve at both
   # its own root and under the /jaeger/ui prefix simultaneously.
   jaeger2:
-    image: jaegertracing/jaeger:2.18.0
+    image: jaegertracing/jaeger-snapshot:6102e1d23f6a6e7db76e8a595b94a12c55b35a86
     networks:
       - proxy-net
 
