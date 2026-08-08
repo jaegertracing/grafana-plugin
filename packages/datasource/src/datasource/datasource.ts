@@ -10,7 +10,7 @@ import {
 } from '@grafana/data';
 import { getBackendSrv, getTemplateSrv, isFetchError } from '@grafana/runtime';
 import { lastValueFrom } from 'rxjs';
-import { JaegerDataSourceOptions, JaegerQuery } from '../types';
+import { DEFAULT_QUERY, JaegerDataSourceOptions, JaegerQuery } from '../types';
 
 // parseLogfmt parses Jaeger's logfmt tag format: space-separated key=value pairs,
 // with quoted values for strings containing spaces.
@@ -39,6 +39,10 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     this.publicUrl = (instanceSettings.jsonData.publicUrl ?? '').replace(/\/+$/, '');
   }
 
+  getDefaultQuery(): Partial<JaegerQuery> {
+    return DEFAULT_QUERY;
+  }
+
   async query(request: DataQueryRequest<JaegerQuery>): Promise<DataQueryResponse> {
     const results = await Promise.all(
       request.targets
@@ -59,7 +63,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     if (interpolated.queryType === 'trace') {
       return Promise.resolve(interpolated.traceId ? this.fetchTrace(interpolated.traceId) : []);
     }
-    return interpolated.service ? this.fetchTraces(interpolated, range) : [];
+    return this.fetchTraces(interpolated, range);
   }
 
   private fetchTrace(traceId: string): Array<ReturnType<typeof createDataFrame>> {

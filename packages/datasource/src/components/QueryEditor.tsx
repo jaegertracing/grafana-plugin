@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DataSourceJsonData, QueryEditorProps } from '@grafana/data';
 import { InlineField, InlineFieldRow, Input, RadioButtonGroup, Select } from '@grafana/ui';
 import { JaegerDataSource } from '../datasource/datasource';
-import { JaegerQuery } from '../types';
+import { DEFAULT_SEARCH_LIMIT, JaegerQuery } from '../types';
 
 type Props = QueryEditorProps<JaegerDataSource, JaegerQuery, DataSourceJsonData>;
 
@@ -16,6 +16,22 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
   const [operations, setOperations] = useState<string[]>([]);
 
   const queryType = query.queryType ?? 'search';
+
+  // getDefaultQuery seeds only new queries, so a query restored from a dashboard or from
+  // Explore's history can still arrive without a limit — and a search with no populated
+  // field is one Grafana will not run. Fill it in once, on mount, so later edits (including
+  // deliberately emptying the box) are left alone.
+  const defaultsApplied = useRef(false);
+  useEffect(() => {
+    if (defaultsApplied.current) {
+      return;
+    }
+    defaultsApplied.current = true;
+    if (queryType === 'search' && query.limit === undefined) {
+      onChange({ ...query, limit: DEFAULT_SEARCH_LIMIT });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     datasource.getServices().then(setServices).catch(() => setServices([]));
@@ -37,7 +53,7 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
       if (value === 'trace') {
         onChange({ ...query, queryType: value, service: undefined, operation: undefined, tags: undefined, minDuration: undefined, maxDuration: undefined, limit: undefined });
       } else {
-        onChange({ ...query, queryType: value, traceId: undefined });
+        onChange({ ...query, queryType: value, traceId: undefined, limit: query.limit ?? DEFAULT_SEARCH_LIMIT });
       }
     },
     [onChange, query]
@@ -81,16 +97,22 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
                 placeholder="Select service or enter variable"
               />
             </InlineField>
-            <InlineField label="Operation" labelWidth={14} htmlFor="query-operation">
+            <InlineField
+              label="Span Name"
+              labelWidth={14}
+              htmlFor="query-operation"
+              tooltip="Names are suggested for the selected service. Type any name to search across all services, where the storage backend supports it."
+            >
               <Select
                 inputId="query-operation"
-                value={operations.find((o) => o === query.operation) ? { label: query.operation, value: query.operation } : null}
+                value={query.operation ? { label: query.operation, value: query.operation } : null}
                 options={operations.map((o) => ({ label: o, value: o }))}
                 width={32}
-                onChange={(v) => onChange({ ...query, operation: v?.value ?? undefined })}
+                onChange={(v) => { onChange({ ...query, operation: v?.value ?? undefined }); }}
+                onCreateOption={(v) => { onChange({ ...query, operation: v }); }}
                 isClearable
-                placeholder="Select operation"
-                disabled={!query.service}
+                allowCustomValue
+                placeholder="Select or enter span name"
               />
             </InlineField>
           </InlineFieldRow>

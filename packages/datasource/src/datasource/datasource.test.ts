@@ -207,14 +207,46 @@ describe('JaegerDataSource — query (search mode)', () => {
     expect(durationField.values[0]).toBeCloseTo(500_000, -1); // 500ms in µs
   });
 
-  it('returns empty data when no service is provided', async () => {
-    mockGetBackendSrv.mockReturnValue({ fetch: jest.fn() });
+  it('supplies a default limit, so a search carrying only a time range is not treated as empty', () => {
+    // Grafana's Explore refuses to run a query whose every field is empty, and it does not
+    // count queryType. Without this default, clearing the Service field left nothing to run.
+    expect(makeInstance().getDefaultQuery()).toMatchObject({ queryType: 'search', limit: 20 });
+  });
+
+  it('searches without a service name, letting the backend decide', async () => {
+    const fetch = jest.fn().mockReturnValue(of({ data: { summaries: [mockSummary] } }));
+    mockGetBackendSrv.mockReturnValue({ fetch });
+
     const ds = makeInstance();
     const result = await ds.query({
       targets: [{ refId: 'A', queryType: 'search', service: '' }],
       range: { from: { valueOf: () => 0 }, to: { valueOf: () => 0 } } as any,
     } as any);
-    expect(result.data).toHaveLength(0);
+
+    const [callArg] = fetch.mock.calls[0];
+    expect(callArg.url).toContain('/api/v3/trace-summaries');
+    expect(callArg.url).toContain('query.serviceName=&');
+    expect(result.data).toHaveLength(1);
+  });
+
+  it('surfaces the error from a backend that requires a service name', async () => {
+    // Backends that key their indices by service name reject the query; Jaeger answers
+    // 400 with an explanation, and Grafana shows it instead of an empty panel.
+    const fetch = jest.fn().mockReturnValue(
+      throwError(() => ({
+        status: 400,
+        data: { message: 'this storage backend requires a service name to search' },
+      }))
+    );
+    mockGetBackendSrv.mockReturnValue({ fetch });
+
+    const ds = makeInstance();
+    await expect(
+      ds.query({
+        targets: [{ refId: 'A', queryType: 'search', service: '' }],
+        range: { from: { valueOf: () => 0 }, to: { valueOf: () => 0 } } as any,
+      } as any)
+    ).rejects.toMatchObject({ status: 400 });
   });
 
   it('applies template variable interpolation', async () => {
