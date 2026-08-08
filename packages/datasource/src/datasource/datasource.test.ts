@@ -47,14 +47,14 @@ describe('JaegerDataSource — constructor', () => {
 });
 
 describe('JaegerDataSource — testDatasource', () => {
-  it('returns success when /api/services responds', async () => {
-    mockGetBackendSrv.mockReturnValue({
-      fetch: jest.fn().mockReturnValue(of({ data: { data: ['frontend'] } })),
-    });
+  it('returns success when /api/v3/services responds', async () => {
+    const fetch = jest.fn().mockReturnValue(of({ data: { services: ['frontend'] } }));
+    mockGetBackendSrv.mockReturnValue({ fetch });
     const ds = makeInstance();
     const result = await ds.testDatasource();
     expect(result.status).toBe('success');
     expect(result.message).toContain('Successfully connected');
+    expect(fetch).toHaveBeenCalledWith({ url: 'http://localhost:16686/api/v3/services' });
   });
 
   it('returns error when fetch throws', async () => {
@@ -70,12 +70,46 @@ describe('JaegerDataSource — testDatasource', () => {
 
 describe('JaegerDataSource — getServices', () => {
   it('returns service list from API', async () => {
-    mockGetBackendSrv.mockReturnValue({
-      fetch: jest.fn().mockReturnValue(of({ data: { data: ['frontend', 'driver'] } })),
-    });
+    const fetch = jest.fn().mockReturnValue(of({ data: { services: ['frontend', 'driver'] } }));
+    mockGetBackendSrv.mockReturnValue({ fetch });
     const ds = makeInstance();
     const services = await ds.getServices();
     expect(services).toEqual(['frontend', 'driver']);
+    expect(fetch).toHaveBeenCalledWith({ url: 'http://localhost:16686/api/v3/services' });
+  });
+
+  it('returns an empty list when the response carries no services', async () => {
+    mockGetBackendSrv.mockReturnValue({ fetch: jest.fn().mockReturnValue(of({ data: {} })) });
+    const ds = makeInstance();
+    expect(await ds.getServices()).toEqual([]);
+  });
+});
+
+describe('JaegerDataSource — getOperations', () => {
+  it('returns operation names and passes the service as a query parameter', async () => {
+    const fetch = jest.fn().mockReturnValue(
+      of({
+        data: {
+          operations: [
+            { name: 'HTTP GET /route', spanKind: 'server' },
+            { name: '/driver.DriverService/FindNearest', spanKind: 'client' },
+          ],
+        },
+      })
+    );
+    mockGetBackendSrv.mockReturnValue({ fetch });
+    const ds = makeInstance();
+    const operations = await ds.getOperations('abc/trifle');
+    expect(operations).toEqual(['HTTP GET /route', '/driver.DriverService/FindNearest']);
+    expect(fetch).toHaveBeenCalledWith({
+      url: 'http://localhost:16686/api/v3/operations?service=abc%2Ftrifle',
+    });
+  });
+
+  it('returns an empty list when the response carries no operations', async () => {
+    mockGetBackendSrv.mockReturnValue({ fetch: jest.fn().mockReturnValue(of({ data: {} })) });
+    const ds = makeInstance();
+    expect(await ds.getOperations('frontend')).toEqual([]);
   });
 });
 
