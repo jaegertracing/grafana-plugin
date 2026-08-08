@@ -196,7 +196,7 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     try {
       await lastValueFrom(
         getBackendSrv().fetch({
-          url: `${this.baseUrl}/api/services`,
+          url: `${this.baseUrl}/api/v3/services`,
         })
       );
       return { status: 'success', message: 'Successfully connected to Jaeger' };
@@ -208,19 +208,20 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
 
   async getServices(): Promise<string[]> {
     const response = await lastValueFrom(
-      getBackendSrv().fetch<{ data: string[] }>({
-        url: `${this.baseUrl}/api/services`,
+      getBackendSrv().fetch<{ services: string[] }>({
+        url: `${this.baseUrl}/api/v3/services`,
       })
     );
-    return response.data.data ?? [];
+    return response.data.services ?? [];
   }
 
+  // api_v3 reports an operation as a name plus a span kind; the query editor only shows names.
   async getOperations(service: string): Promise<string[]> {
     const response = await lastValueFrom(
-      getBackendSrv().fetch<{ data: string[] }>({
-        url: `${this.baseUrl}/api/services/${encodeURIComponent(service)}/operations`,
+      getBackendSrv().fetch<{ operations: Array<{ name: string; spanKind: string }> }>({
+        url: `${this.baseUrl}/api/v3/operations?service=${encodeURIComponent(service)}`,
       })
     );
-    return response.data.data ?? [];
+    return response.data.operations?.map((operation) => operation.name) ?? [];
   }
 }

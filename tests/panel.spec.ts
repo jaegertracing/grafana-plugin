@@ -7,7 +7,7 @@ test('trace mode shows hint when no trace ID is set', async ({ gotoPanelEditPage
   await expect(panelEditPage.panel.locator).toContainText('Enter a Trace ID in panel options.');
 });
 
-test('DataProxy can reach Jaeger — /api/services returns data', async ({
+test('DataProxy can reach Jaeger — /api/v3/services returns data', async ({
   readProvisionedDataSource,
   request,
 }) => {
@@ -16,10 +16,10 @@ test('DataProxy can reach Jaeger — /api/services returns data', async ({
   const datasource = await readProvisionedDataSource({ fileName: 'datasources.yml' });
   // A 200 response proves the DataProxy can reach Jaeger — no need to assert
   // non-empty services since HotROD may not have sent traces yet at test time.
-  const resp = await request.get(`/api/datasources/proxy/uid/${datasource.uid}/api/services`);
+  const resp = await request.get(`/api/datasources/proxy/uid/${datasource.uid}/api/v3/services`);
   await expect(resp).toBeOK();
   const body = await resp.json();
-  expect(Array.isArray(body.data)).toBe(true);
+  expect(Array.isArray(body.services)).toBe(true);
 });
 
 test('datasource QueryEditor service dropdown is populated from live Jaeger API', async ({

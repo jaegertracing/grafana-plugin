@@ -144,9 +144,9 @@ assert_http_200      "Option1 index.html"          "$OPTION1_URL/"
 # The backend no longer writes a static <base href="/prefix/"> — assert the marker.
 assert_body_contains "Option1 inline script marker" "$OPTION1_URL/" \
     "data-inject-target=\"BASE_URL\""
-assert_http_200      "Option1 /api/services"       "$OPTION1_URL/api/services"
-assert_json_field    "Option1 services non-empty"  "$OPTION1_URL/api/services" \
-    '.data | length'
+assert_http_200      "Option1 /api/v3/services"    "$OPTION1_URL/api/v3/services"
+assert_json_field    "Option1 services non-empty"  "$OPTION1_URL/api/v3/services" \
+    '.services | length'
 assert_assets_load   "Option1 assets"              "$OPTION1_URL"
 
 echo ""
@@ -156,9 +156,9 @@ assert_http_200      "Option2 index.html"           "$OPTION2_URL/"
 # No Substitute rewriting needed since 2.18.0 — just check the script marker is present.
 assert_body_contains "Option2 inline script marker" "$OPTION2_URL/" \
     "data-inject-target=\"BASE_URL\""
-assert_http_200      "Option2 /api/services"        "$OPTION2_URL/api/services"
-assert_json_field    "Option2 services non-empty"   "$OPTION2_URL/api/services" \
-    '.data | length'
+assert_http_200      "Option2 /api/v3/services"     "$OPTION2_URL/api/v3/services"
+assert_json_field    "Option2 services non-empty"   "$OPTION2_URL/api/v3/services" \
+    '.services | length'
 assert_assets_load   "Option2 assets"               "$OPTION2_URL"
 
 echo ""
