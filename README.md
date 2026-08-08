@@ -1,5 +1,7 @@
 # Jaeger Plugins for Grafana
 
+Requires **Jaeger v2.19.0 or newer**.
+
 Two Grafana plugins for embedding [Jaeger](https://www.jaegertracing.io/) trace visualizations in Grafana dashboards: a **datasource plugin** that connects to a Jaeger Query service, and a **panel plugin** that renders Jaeger's UI in an iframe using Jaeger's built-in `uiEmbed=v0` mode.
 
 ## Overview
