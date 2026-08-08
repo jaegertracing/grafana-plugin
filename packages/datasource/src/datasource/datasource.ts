@@ -10,7 +10,7 @@ import {
 } from '@grafana/data';
 import { getBackendSrv, getTemplateSrv, isFetchError } from '@grafana/runtime';
 import { lastValueFrom } from 'rxjs';
-import { JaegerDataSourceOptions, JaegerQuery } from '../types';
+import { DEFAULT_QUERY, JaegerDataSourceOptions, JaegerQuery } from '../types';
 
 // parseLogfmt parses Jaeger's logfmt tag format: space-separated key=value pairs,
 // with quoted values for strings containing spaces.
@@ -37,6 +37,10 @@ export class JaegerDataSource extends DataSourceApi<JaegerQuery, JaegerDataSourc
     this.baseUrl = (instanceSettings.url ?? '').replace(/\/+$/, '');
     // publicUrl: the browser-accessible Jaeger URL used for the panel iframe.
     this.publicUrl = (instanceSettings.jsonData.publicUrl ?? '').replace(/\/+$/, '');
+  }
+
+  getDefaultQuery(): Partial<JaegerQuery> {
+    return DEFAULT_QUERY;
   }
 
   async query(request: DataQueryRequest<JaegerQuery>): Promise<DataQueryResponse> {

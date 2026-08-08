@@ -207,6 +207,12 @@ describe('JaegerDataSource — query (search mode)', () => {
     expect(durationField.values[0]).toBeCloseTo(500_000, -1); // 500ms in µs
   });
 
+  it('supplies a default limit, so a search carrying only a time range is not treated as empty', () => {
+    // Grafana's Explore refuses to run a query whose every field is empty, and it does not
+    // count queryType. Without this default, clearing the Service field left nothing to run.
+    expect(makeInstance().getDefaultQuery()).toMatchObject({ queryType: 'search', limit: 20 });
+  });
+
   it('searches without a service name, letting the backend decide', async () => {
     const fetch = jest.fn().mockReturnValue(of({ data: { summaries: [mockSummary] } }));
     mockGetBackendSrv.mockReturnValue({ fetch });
